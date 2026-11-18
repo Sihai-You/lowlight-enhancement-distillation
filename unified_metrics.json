@@ -1,0 +1,367 @@
+{
+  "timestamp": "2026-10-29T23:17:14.435155",
+  "device": "cuda",
+  "remove_outliers": true,
+  "models": {
+    "full": {
+      "psnr": {
+        "mean": 21.346,
+        "std": 4.4327,
+        "n": 15
+      },
+      "ssim": {
+        "mean": 0.8734,
+        "std": 0.0443,
+        "n": 15
+      },
+      "piqe": {
+        "mean": 22.3929,
+        "std": 6.8852,
+        "n": 15
+      },
+      "niqe": {
+        "mean": 3.7635,
+        "std": 0.7464,
+        "n": 15
+      },
+      "mean_brightness": {
+        "mean": 114.8917,
+        "std": 21.9196
+      },
+      "std_brightness": {
+        "mean": 40.9983,
+        "std": 10.956
+      },
+      "michelson_contrast": {
+        "mean": 0.8156,
+        "std": 0.0608
+      },
+      "histogram_entropy": {
+        "mean": 6.9533,
+        "std": 0.3003
+      },
+      "brightness_skewness": {
+        "mean": -0.0183,
+        "std": 0.4922
+      },
+      "brightness_kurtosis": {
+        "mean": -0.5763,
+        "std": 0.7714
+      },
+      "brightness_uniformity": {
+        "median": 0.788223,
+        "q1": 0.695168,
+        "q3": 0.831301
+      },
+      "dynamic_range": {
+        "median": 218.0,
+        "q1": 189.5,
+        "q3": 236.0
+      },
+      "over_exposed_ratio": {
+        "median": 4e-06,
+        "q1": 0.0,
+        "q3": 0.000346
+      },
+      "under_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.0
+      },
+      "params_m": 0.144261,
+      "inference_ms": {
+        "mean": 2.7418,
+        "std": 0.0574
+      },
+      "inference_fps": 364.72
+    },
+    "without_attention": {
+      "psnr": {
+        "mean": 17.907361602783205,
+        "std": 3.1614665883292,
+        "n": 15
+      },
+      "ssim": {
+        "mean": 0.7935249006683859,
+        "std": 0.07206960673769369,
+        "n": 15
+      },
+      "piqe": {
+        "mean": 15.98782159407258,
+        "std": 3.6115500603488506,
+        "n": 15
+      },
+      "niqe": {
+        "mean": 4.07122006102899,
+        "std": 0.5414058372246416,
+        "n": 15
+      },
+      "mean_brightness": {
+        "mean": 108.29293772379557,
+        "std": 15.294784957170487
+      },
+      "std_brightness": {
+        "mean": 30.096621922084264,
+        "std": 4.322806025132889
+      },
+      "michelson_contrast": {
+        "mean": 0.7249989827473958,
+        "std": 0.04968566275050525
+      },
+      "histogram_entropy": {
+        "mean": 6.635146428838015,
+        "std": 0.15480930581996843
+      },
+      "brightness_skewness": {
+        "mean": 0.03590676995615164,
+        "std": 0.6589451411782968
+      },
+      "brightness_kurtosis": {
+        "mean": -0.5059101240975517,
+        "std": 0.6693507634990963
+      },
+      "brightness_uniformity": {
+        "median": 0.8320154523101124,
+        "q1": 0.7810453555189261,
+        "q3": 0.8734204832376682
+      },
+      "dynamic_range": {
+        "median": 206.0,
+        "q1": 151.5,
+        "q3": 219.5
+      },
+      "over_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 1.25e-05
+      },
+      "under_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.0
+      },
+      "params_m": 0.127877,
+      "inference_ms": {
+        "mean": 2.3432,
+        "std": 0.0588
+      },
+      "inference_fps": 426.76
+    },
+    "without_adaptive_residual": {
+      "psnr": {
+        "mean": 18.359622764587403,
+        "std": 4.450415482774732,
+        "n": 15
+      },
+      "ssim": {
+        "mean": 0.8174896068466438,
+        "std": 0.06403801541837449,
+        "n": 15
+      },
+      "piqe": {
+        "mean": 16.068791290113015,
+        "std": 4.37446786796326,
+        "n": 15
+      },
+      "niqe": {
+        "mean": 4.529847775580175,
+        "std": 0.5273335224797555,
+        "n": 15
+      },
+      "mean_brightness": {
+        "mean": 109.02967656453451,
+        "std": 20.387396462671695
+      },
+      "std_brightness": {
+        "mean": 33.59806900024414,
+        "std": 9.233377862305616
+      },
+      "michelson_contrast": {
+        "mean": 0.7408602450575147,
+        "std": 0.06238854726712554
+      },
+      "histogram_entropy": {
+        "mean": 6.656690399022906,
+        "std": 0.27550381171020816
+      },
+      "brightness_skewness": {
+        "mean": 0.11288190434376398,
+        "std": 0.707438070031041
+      },
+      "brightness_kurtosis": {
+        "mean": -0.5346158009309036,
+        "std": 0.7367444834561235
+      },
+      "brightness_uniformity": {
+        "median": 0.8326732973198795,
+        "q1": 0.734113872587138,
+        "q3": 0.850472714521823
+      },
+      "dynamic_range": {
+        "median": 204.0,
+        "q1": 171.0,
+        "q3": 221.5
+      },
+      "over_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 3.75e-05
+      },
+      "under_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.0
+      },
+      "params_m": 0.144259,
+      "inference_ms": {
+        "mean": 2.7288,
+        "std": 0.0313
+      },
+      "inference_fps": 366.46
+    },
+    "reduced_channels": {
+      "psnr": {
+        "mean": 18.443471654256186,
+        "std": 4.416889615242577,
+        "n": 15
+      },
+      "ssim": {
+        "mean": 0.819408814816813,
+        "std": 0.061899376461771155,
+        "n": 15
+      },
+      "piqe": {
+        "mean": 17.93739784606709,
+        "std": 4.2936952812263645,
+        "n": 15
+      },
+      "niqe": {
+        "mean": 4.209895938147144,
+        "std": 0.5639169707052437,
+        "n": 15
+      },
+      "mean_brightness": {
+        "mean": 114.90440427339993,
+        "std": 10.842043394821546
+      },
+      "std_brightness": {
+        "mean": 32.3202486038208,
+        "std": 7.023800466543737
+      },
+      "michelson_contrast": {
+        "mean": 0.7242522795995077,
+        "std": 0.07439633600186436
+      },
+      "histogram_entropy": {
+        "mean": 6.661070437340673,
+        "std": 0.2674360552778693
+      },
+      "brightness_skewness": {
+        "mean": 0.09039227138938648,
+        "std": 0.49902359343184194
+      },
+      "brightness_kurtosis": {
+        "mean": -0.24493446520396642,
+        "std": 1.0951282800848918
+      },
+      "brightness_uniformity": {
+        "median": 0.8238059014967939,
+        "q1": 0.7328716451510517,
+        "q3": 0.8500319529714551
+      },
+      "dynamic_range": {
+        "median": 207.0,
+        "q1": 162.0,
+        "q3": 219.5
+      },
+      "over_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 4.0625e-05
+      },
+      "under_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.0
+      },
+      "params_m": 0.011109,
+      "inference_ms": {
+        "mean": 2.6753,
+        "std": 0.0627
+      },
+      "inference_fps": 373.79
+    },
+    "without_skip": {
+      "psnr": {
+        "mean": 18.879350916544595,
+        "std": 2.9948971126034825,
+        "n": 15
+      },
+      "ssim": {
+        "mean": 0.8166393387618762,
+        "std": 0.03895352629339565,
+        "n": 15
+      },
+      "piqe": {
+        "mean": 31.17039855628317,
+        "std": 7.1139766591916604,
+        "n": 15
+      },
+      "niqe": {
+        "mean": 5.755461088175652,
+        "std": 0.5162629877845126,
+        "n": 15
+      },
+      "mean_brightness": {
+        "mean": 118.77623203822544,
+        "std": 20.43035354525863
+      },
+      "std_brightness": {
+        "mean": 32.809566906520296,
+        "std": 7.834913610163717
+      },
+      "michelson_contrast": {
+        "mean": 0.7192651708920796,
+        "std": 0.042925837089988025
+      },
+      "histogram_entropy": {
+        "mean": 6.680485666220349,
+        "std": 0.2866704240423277
+      },
+      "brightness_skewness": {
+        "mean": -0.00022786722651549747,
+        "std": 0.4973523741039617
+      },
+      "brightness_kurtosis": {
+        "mean": -0.5257564783096313,
+        "std": 0.643944992196177
+      },
+      "brightness_uniformity": {
+        "median": 0.8121616853472504,
+        "q1": 0.7308708959052308,
+        "q3": 0.8585633769005512
+      },
+      "dynamic_range": {
+        "median": 204.0,
+        "q1": 173.0,
+        "q3": 212.5
+      },
+      "over_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.00010833333333333333
+      },
+      "under_exposed_ratio": {
+        "median": 0.0,
+        "q1": 0.0,
+        "q3": 0.0
+      },
+      "params_m": 0.144261,
+      "inference_ms": {
+        "mean": 2.3008,
+        "std": 0.0733
+      },
+      "inference_fps": 434.63
+    }
+  }
+}

@@ -1,0 +1,29 @@
+# 模型权重与 ONNX 导出
+*.pth
+*.onnx
+*.engine
+*.trt
+
+# 结果 / 中间产物 / 问卷资源目录
+/results/
+/golden/
+/mos/
+
+# 压缩包
+*.zip
+
+# 含远程服务器凭据的临时运维脚本（禁止提交）
+download_retinexformer.py
+run_retinexformer_latency.py
+upload_util.py
+
+# 过程性 / 非正式文档
+paper_revision.md
+sci_revision_suggestions.md
+fpga_handoff.md
+jetson_validation_task.md
+
+# Python 缓存
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

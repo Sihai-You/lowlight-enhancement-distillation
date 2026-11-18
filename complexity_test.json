@@ -1,0 +1,56 @@
+{
+  "full": {
+    "params_M": 0.1443,
+    "gmacs_256": 1.9708,
+    "gmacs_400x600": 7.2173,
+    "latency_ms": 2.807,
+    "latency_std_ms": 0.086,
+    "fps": 356.2,
+    "peak_gpu_mb": 144.9
+  },
+  "without_attention": {
+    "params_M": 0.1279,
+    "gmacs_256": 1.9698,
+    "gmacs_400x600": 7.2134,
+    "latency_ms": 2.313,
+    "latency_std_ms": 0.043,
+    "fps": 432.4,
+    "peak_gpu_mb": 145.8
+  },
+  "without_adaptive_residual": {
+    "params_M": 0.1443,
+    "gmacs_256": 1.9708,
+    "gmacs_400x600": 7.2173,
+    "latency_ms": 2.717,
+    "latency_std_ms": 0.045,
+    "fps": 368.1,
+    "peak_gpu_mb": 144.9
+  },
+  "without_skip": {
+    "params_M": 0.1443,
+    "gmacs_256": 1.1404,
+    "gmacs_400x600": 4.176,
+    "latency_ms": 2.241,
+    "latency_std_ms": 0.049,
+    "fps": 446.3,
+    "peak_gpu_mb": 82.4
+  },
+  "reduced_channels": {
+    "params_M": 0.0111,
+    "gmacs_256": 0.1907,
+    "gmacs_400x600": 0.6984,
+    "latency_ms": 2.65,
+    "latency_std_ms": 0.063,
+    "fps": 377.4,
+    "peak_gpu_mb": 45.9
+  },
+  "DDNet_teacher": {
+    "params_M": 5.3898,
+    "gmacs_256": 30.1779,
+    "gmacs_400x600": 110.5147,
+    "latency_ms": 44.359,
+    "latency_std_ms": 0.074,
+    "fps": 22.5,
+    "peak_gpu_mb": 185.0
+  }
+}
