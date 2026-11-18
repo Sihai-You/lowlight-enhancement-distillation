@@ -288,7 +288,7 @@ This work is partly supported by National Natural Science Foundation of China (G
 
 ## Code and Data Availability
 
-The source code, trained model weights, and evaluation scripts for this work will be publicly released upon publication and are available from the corresponding author upon reasonable request. The LOL low-light dataset used for training and evaluation, along with the other public benchmarks (DICM, LIME, LOL-v2-real, and MIT-FiveK), are publicly available from their original sources. All experiments are fully reproducible from the complete hyperparameters and the unified evaluation protocol reported in Section 4.1.
+The source code, trained model weights, and evaluation scripts for this work will be publicly released on GitHub upon acceptance and are available from the corresponding author upon reasonable request. The LOL low-light dataset used for training and evaluation, along with the other public benchmarks (DICM, LIME, LOL-v2-real, and MIT-FiveK), are publicly available from their original sources. All experiments are fully reproducible from the complete hyperparameters and the unified evaluation protocol reported in Section 4.1.
 
 ---
 
