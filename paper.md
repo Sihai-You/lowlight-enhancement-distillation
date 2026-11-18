@@ -1,6 +1,6 @@
 # Research on a Real-Time Low-Light Image Enhancement Lightweight Network Based on Knowledge Distillation
 
-**Xin Zhao, Sihai You**
+**Sihai You, Xin Zhao**
 
 ---
 
