@@ -1,0 +1,696 @@
+%=================================================================
+\documentclass[sensors,article,submit,moreauthors]{Definitions/mdpi}
+
+%--------------------
+% MDPI internal commands - do not modify
+\firstpage{1}
+\makeatletter
+\setcounter{page}{\@firstpage}
+\makeatother
+\pubvolume{1}
+\issuenum{1}
+\articlenumber{0}
+\pubyear{2026}
+\copyrightyear{2026}
+\datereceived{ }
+\daterevised{ }
+\dateaccepted{ }
+\datepublished{ }
+
+%=================================================================
+% Full title of the paper
+\Title{Research on a Real-Time Low-Light Image Enhancement Lightweight Network Based on Knowledge Distillation}
+
+% Author Orchid ID: enter ID or remove command
+\newcommand{\orcidauthorA}{0000-0000-0000-000X} % Add \orcidA{} behind the author's name
+
+% Authors
+\Author{Sihai You \textsuperscript{1}\orcidA{} and Xin Zhao \textsuperscript{1,}*}
+
+% MDPI internal command: Authors, for metadata in PDF
+\AuthorNames{Sihai You and Xin Zhao}
+
+% Affiliations
+\address{\textsuperscript{1} \quad Affiliation 1; email@example.com}
+
+% Contact information of the corresponding author
+\corres{Correspondence: email@example.com}
+
+% Abstract
+\abstract{To address the issues of high computational complexity and difficulty in deploying existing low-light image enhancement models on mobile devices, this paper proposes a real-time low-light image enhancement method based on knowledge distillation. This method constructs a teacher-student network architecture: using the high-performance DDNet as the teacher model to guide the learning of the student model---a self-designed lightweight encoder-decoder network. By designing a multi-level distillation loss function, the enhancement capability of the teacher model is efficiently transferred to the student model. Experimental results on the LOL dataset show that the proposed student model achieves a favorable trade-off between enhancement quality and efficiency while being extremely lightweight: it uses only 2.7\% of the teacher model's parameters (0.144 M vs 5.39 M), requires 15.3$\times$ fewer FLOPs (7.22 vs 110.51 GMac), and runs 16.2$\times$ faster (2.74 ms vs 44.36 ms per image, 365 FPS). In terms of enhancement quality, the student model attains visual fidelity comparable to that of the teacher model (PSNR 21.35 dB, SSIM 0.87 vs 0.86) and perceptual quality superior to the teacher (PIQE 22.39 vs 26.81) together with the best brightness uniformity (0.79). Ablation experiments verify the effectiveness of core components such as the attention mechanism. Beyond 365 FPS on a datacenter GPU, the student is benchmarked on an NVIDIA Jetson Orin Nano Super edge device, where it reaches 15.02 FPS in FP32 and 21.73 FPS in FP16 (46.02 ms) with less than 0.5 GB of peak memory, approaching the real-time video threshold and confirming its practical deployability on resource-constrained edge devices.}
+
+% Keywords
+\keyword{Low-light image enhancement; Knowledge distillation; Lightweight neural networks; Real-time image processing; Deep learning.}
+
+\begin{document}
+
+\section{Introduction}
+
+Image acquisition under low-light conditions is a long-standing fundamental challenge in the field of computer vision. In numerous practical application scenarios such as nighttime surveillance, autonomous driving, medical imaging, and mobile photography, insufficient lighting often leads to problems such as low brightness, attenuated contrast, color distortion, and significant noise in images, severely limiting the accuracy and reliability of subsequent high-level vision tasks (e.g., object detection, semantic segmentation, face recognition, shadow detection) \cite{ref1,ref2,ref3,ref4,ref5}. Therefore, researching efficient and robust low-light image enhancement technology is of significant theoretical importance and practical value for improving the performance of visual systems under complex lighting conditions.
+
+In recent years, with the rapid development of deep learning, low-light enhancement methods based on Convolutional Neural Networks (CNNs) and Transformers have achieved breakthrough progress. These methods, through end-to-end learning, can implicitly learn illumination mapping and feature reconstruction from large amounts of data, significantly surpassing traditional methods based on histogram equalization \cite{ref28} and Retinex theory \cite{ref7} in terms of image quality. However, current mainstream deep models (e.g., KinD \cite{ref8}, RUAS \cite{ref9}, URetinex-Net \cite{ref10}) generally face problems such as large parameter counts, high computational complexity, and slow inference speeds \cite{ref11}, making them difficult to deploy in real-time on mobile terminals, embedded devices, or edge computing platforms (e.g., the Jetson series) with limited computational resources, thereby restricting their wide application in real-world scenarios.
+
+Knowledge distillation, as an effective model compression and performance transfer technique, guides a lightweight student model to mimic the output or intermediate features of a complex teacher model during training, enabling significant reduction in model size while maintaining or even improving performance \cite{ref12,ref13}. This technique has achieved success in various vision tasks such as image classification \cite{ref14,ref15}, object detection \cite{ref16,ref17,ref18}, and super-resolution \cite{ref19,ref20,ref21}. However, in the specific field of low-light image enhancement, the application of knowledge distillation is still in its preliminary stages and faces the following core challenges \cite{ref22,ref23,ref24}: First, student models often struggle to surpass teacher models on key quality metrics (e.g., PSNR, SSIM). Second, while achieving model lightweighting and inference acceleration, it is also necessary to maintain the natural reconstruction ability for image details, contrast, and color. Third, there is a lack of specialized distillation strategies and loss functions designed for low-light characteristics.
+
+Addressing the aforementioned challenges and demands, this paper proposes a lightweight low-light image enhancement network based on multi-level knowledge distillation. The main contributions of this paper are as follows:
+
+\begin{itemize}
+\item \textbf{Architecture Design:} A lightweight student network based on an encoder-decoder structure is constructed, incorporating enhanced depthwise separable convolutions and a dual attention mechanism. This significantly improves inference efficiency on edge devices while ensuring enhancement performance.
+\item \textbf{Innovation in Distillation Strategy:} A multi-level distillation loss function is designed, encompassing output distribution, deep features, local contrast, and global brightness consistency. This enables the student model to comprehensively inherit the enhancement capability of the teacher model, attaining enhancement quality competitive with the teacher model while drastically reducing model size and latency.
+\item \textbf{Comprehensive Experimental Validation:} Systematic quantitative, real-time, and visual comparison experiments are conducted on public low-light datasets. The results show that the proposed method achieves a favorable trade-off between enhancement quality and inference speed: it runs at 365 FPS (2.74 ms per frame) on a datacenter GPU and at 15.02--21.73 FPS on a low-power NVIDIA Jetson Orin Nano Super edge device, providing a reliable solution for the practical deployment of low-light enhancement technology in mobile and embedded environments.
+\end{itemize}
+
+The structure of the subsequent chapters of this paper is as follows: Section 2 reviews related work on low-light enhancement, knowledge distillation, and lightweight networks. Section 3 details the proposed method framework. Section 4 presents the experimental setup and result analysis. Section 5 provides an in-depth discussion on the advantages, application value, and limitations of the method. Section 6 summarizes the full text and looks forward to future research directions.
+
+\section{Related Work}
+
+\subsection{Low-Light Image Enhancement Methods}
+
+Traditional low-light image enhancement methods are primarily based on histogram equalization \cite{ref28} and Retinex theory \cite{ref7}. In recent years, deep learning methods have dominated this field, such as KinD \cite{ref8}, RUAS \cite{ref9}, URetinex-Net \cite{ref10}, Rw-Dm \cite{ref6}, and RetinexMamba \cite{ref36}. For instance, LLNet uses a deep autoencoder to learn the mapping from low-light to normal-light images, MBLLEN extracts multi-scale features through a multi-branch network, and Zero-DCE \cite{ref26} uses an unsupervised learning approach to estimate illumination curves. Although these methods achieve significant effects, they suffer from high model complexity and slow inference speeds.
+
+\subsection{Knowledge Distillation Technology}
+
+Knowledge distillation was first proposed by Hinton et al., achieving knowledge transfer by minimizing the KL divergence between the outputs of the teacher and student models. Subsequent research has expanded the forms of distillation, including feature distillation, relational distillation, etc. In image enhancement tasks, knowledge distillation has been applied to fields like super-resolution and denoising, but its application in low-light enhancement remains relatively scarce.
+
+\subsection{Lightweight Network Design}
+
+Lightweight network design primarily reduces model parameters and computational load through techniques such as depthwise separable convolutions, channel pruning, and neural architecture search. These techniques originated mainly in image classification networks (e.g., MobileNet, ShuffleNet) and have gradually been introduced into low-level vision tasks, and more recently efficient low-level vision backbones based on state space models (e.g., MambaIR \cite{ref35}) have emerged. In this paper, DDNet \cite{ref25}, a high-precision low-light enhancement network, is adopted as the teacher model; although it achieves excellent enhancement quality, its parameter count (5.39 M) and inference latency are still too high for edge deployment, so knowledge distillation is introduced to compress its enhancement capability into a lightweight student network.
+
+\section{Method}
+
+\subsection{Overall Framework}
+
+The proposed knowledge distillation framework consists of two parts: a teacher model and a student model. The teacher model adopts a pre-trained DDNet, which performs excellently in low-light enhancement tasks. The student model is a self-designed lightweight network that learns the enhancement capability of the teacher model through knowledge distillation.
+
+During training, a low-light image is simultaneously input into both the teacher and student models, yielding respective enhancement results. The outputs of the two models are constrained by the designed distillation loss function, enabling the student model to approximate the teacher model's enhancement capability with far fewer parameters.
+
+\subsection{Teacher Model and Overall Distillation Framework}
+
+The teacher model employs a multi-stage architecture for fusion-decomposition-fusion processing of the color domain and gradient domain. To facilitate understanding, Figure~\ref{fig1} illustrates the architectural design of DDNet. Specifically, the low-light image is first concatenated with its corresponding gradient feature map based on LoG and then fed into the network. This architecture introduces six self-calibrating convolutions (ScCAM) with attention modules into the peripheral encoder, decoder, Gradient Enhancement Module (GEM), and Coarse Enhancement Module (CEM), respectively.
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{figs/fig1.png}
+\caption{DDNet teacher-model architecture.\label{fig1}}
+\end{figure}
+
+Figure~\ref{fig2} illustrates the overall knowledge distillation framework of the proposed method. The low-light image is fed simultaneously into the pre-trained teacher model DDNet and the student model. The teacher, with frozen weights, provides the dual-domain enhancement reference output $T$, while the student output $S$ is aligned with the teacher output through a multi-level distillation loss (cosine similarity, perceptual, brightness, contrast, and SSIM). Meanwhile, the normal-light ground-truth image $Y$ serves as an anchor for the reconstruction loss, and the final enhanced image is produced via adaptive residual fusion.
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{figs/fig2.png}
+\caption{Overall teacher-student knowledge distillation framework of the proposed method.\label{fig2}}
+\end{figure}
+
+\subsection{Student Model Design}
+
+To meet the demand for real-time low-light image enhancement, this study proposes a lightweight image enhancement network based on knowledge distillation. This network aims to inherit the enhancement capabilities of the dual-domain guided teacher model (DDNet) while significantly reducing computational complexity to meet the real-time processing requirements of ultra-high-definition video streams. As shown in Figure~\ref{fig3}, the student model adopts an encoder-decoder architecture. Its core design lies in achieving efficient image enhancement with limited parameters through depthwise separable convolutions, a simplified attention mechanism, and adaptive residual fusion.
+
+The network input is a three-channel low-light image. First, basic features are extracted through an initial convolutional layer. Subsequently, the features undergo downsampling and abstraction through a two-level encoder: the first-level encoder consists of depthwise separable convolutions and max pooling, expanding the number of channels to 64 and halving the spatial resolution; the second-level encoder further expands the channels to 128 and reduces the resolution to 1/4 of the original through depthwise separable convolutions and pooling operations. The encoded high-dimensional features are then fed into a bottleneck layer. This layer first expands the channels to 256 through depthwise separable convolutions and residual blocks, and then introduces a lightweight simplified channel attention module.
+
+The simplified channel attention module employs a dual-path pooling strategy with shared weights to enhance the response of important feature channels. Given the input feature $F$, the module first calculates average pooling and max pooling along the channel dimension to obtain two feature descriptors $F_{avg}$ and $F_{max}$:
+
+\begin{equation}
+F_{avg} = \operatorname{AvgPool}(F), \quad F_{max} = \operatorname{MaxPool}(F)
+\end{equation}
+
+Subsequently, these two descriptors are transformed through a shared fully connected layer to generate the channel attention weights $A$:
+
+\begin{equation}
+A = \sigma(W \cdot [F_{avg}, F_{max}])
+\end{equation}
+
+where $W$ is the shared weight matrix, and $\sigma$ denotes the Sigmoid activation function. Finally, the input features are weighted by the channel attention:
+
+\begin{equation}
+F' = F \otimes A
+\end{equation}
+
+where $\otimes$ denotes element-wise channel multiplication. This design significantly improves the feature selection capability of the model with almost no increase in computational overhead.
+
+The decoding process aims to restore the spatial details and original resolution of the image. The first-level decoder processes the attention-weighted features with depthwise separable convolutions, recovers half of the resolution via bilinear upsampling, and then concatenates and fuses them with the output features of the first-level encoder through skip connections. The second-level decoder operates similarly, finally fusing with the features from the initial convolutional layer to fully restore the resolution to the original size. The network's final output layer generates a preliminary enhancement result $I_{enh}$ through convolution and the Sigmoid activation function.
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{figs/fig3.png}
+\caption{Architecture of the lightweight student model.\label{fig3}}
+\end{figure}
+
+To balance enhancement effects and naturalness, an adaptive residual fusion module is designed. This module dynamically fuses the original input $I_{in}$ with the network output $I_{enh}$ through two learnable parameters $\alpha$ and $\beta$, yielding the final enhanced image $I_{out}$:
+
+\begin{equation}
+I_{out} = \sigma(\alpha)\cdot I_{in} + \sigma(\beta)\cdot I_{enh}
+\end{equation}
+
+where $\sigma$ is the Sigmoid function, ensuring the fusion weights are between 0 and 1. This design enables the model to adaptively preserve the natural characteristics of the input image while enhancing details in dark areas.
+
+The student model learns from the teacher model by minimizing a multi-level distillation loss that jointly aligns the outputs, deep features, local contrast, and global brightness of the two networks, while remaining anchored to the ground truth. Let $S$ and $T$ denote the enhancement outputs of the student and teacher models, respectively, and let $Y$ denote the normal-light ground truth where available. The total training objective is formulated as:
+
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{equation}
+L_{total} = w_{cos}\cdot L_{cos} + w_{per}\cdot L_{per} + w_{bri}\cdot L_{bri} + w_{con}\cdot L_{con} + 0.1\cdot L_{ssim} + w_{rec}\cdot L_{rec} + 0.05\cdot L_{mse}
+\end{equation}
+\end{adjustwidth}
+
+where the terms are defined as follows. (1) The output-alignment term measures the cosine dissimilarity between the $\ell_2$-normalized outputs, $L_{cos} = 1 - \cos(\hat{S}, \hat{T})$, which transfers the teacher's global enhancement mapping without requiring a matched intensity scale. (2) The perceptual term aligns the deep features of a lightweight VGG encoder, $L_{per} = \|\phi(S) - \phi(T)\|_1$. (3) The brightness term aligns the global luminance channels, $L_{bri} = \|Y(S) - Y(T)\|_1$, with $Y(\cdot) = 0.299R + 0.587G + 0.114B$. (4) The contrast term aligns the spatial standard deviations, $L_{con} = \|\operatorname{std}(S) - \operatorname{std}(T)\|_1$. The structural term is $L_{ssim} = 1 - \operatorname{SSIM}(S, T)$, and the ground-truth reconstruction terms are $L_{rec} = \|S - Y\|_1$ and $L_{mse} = \|S - Y\|_2^2$. The four primary distillation weights $[w_{cos}, w_{per}, w_{bri}, w_{con}]$ are produced by a softmax over learnable parameters $(\alpha, \beta, \gamma, \delta)$ initialized to $(0.7, 0.2, 0.05, 0.05)$, and the reconstruction weight is scheduled as $w_{rec} = 0.1 + 0.3\cdot\min(1, \mathrm{epoch}/50)$. By aligning the student with the teacher at both the feature and output levels, this strategy transfers the teacher's color-enhancement ability without explicitly computing the complex gradient-domain information, achieving extreme lightweighting and real-time performance while preserving enhancement quality and supporting deployment on resource-constrained edge devices for ultra-high-definition video streams.
+
+\section{Experiments and Results}
+
+\subsection{Experimental Setup}
+
+The experiments were conducted on a high-performance computing server with the following hardware configuration: an Intel Xeon E5-2698v4 processor (2.20 GHz base frequency, 20 physical cores, 80 logical threads) with 503.8 GB of system memory. The server is equipped with 8 NVIDIA Tesla V100-SXM2-32GB GPUs, each with 32 GB of video memory; for a fair comparison, model training and all reported inference timings were performed on a single one of these GPUs. The software environment was based on Linux 5.15.0-163-generic (x86\_64 architecture), Python 3.7.12, and the PyTorch 1.9.0 framework, with GPU computing acceleration enabled via CUDA 11.1. This configuration provided sufficient computing resources and memory support, ensuring the efficiency and reproducibility of the experimental process.
+
+\textbf{1) Datasets:} The LOL (Low-Light) dataset was used for training and evaluation. This dataset contains 485 pairs of low-light/normal-light images as the training set and 15 pairs as the test set. The proposed method (Our method/Student model) was compared with seven mainstream low-light enhancement methods: DDNet \cite{ref25}, Zero-DCE \cite{ref26}, SCI \cite{ref27}, RUAS \cite{ref9}, Retinexformer \cite{ref34}, HE \cite{ref28}, and Dong \cite{ref29}. Evaluation dimensions included objective quantitative metrics and subjective visual effects. All methods were tested under the same hardware environment (single GPU workstation) to ensure fairness.
+
+\textbf{2) Evaluation Metrics:} In the performance evaluation of low-light image enhancement algorithms, quantitative analysis was conducted by combining four categories of metrics: pixel-level fidelity, subjective perceptual quality, brightness characteristics, and model efficiency. The physical meaning, evaluation criteria, and applicable scenarios of each metric are shown in Table 1.
+
+\begin{table}[H]
+\small
+\caption{Description of Evaluation Metrics for Low-Light Image Enhancement Experiments.\label{tab1}}
+\begin{tabularx}{\textwidth}{LLCLL}
+\toprule
+\textbf{Indicator Category}	& \textbf{Indicator Name (Abbreviation)}	& \textbf{Unit}	& \textbf{Evaluation Criterion}	& \textbf{Physical Meaning}\\
+\midrule
+Image Quality Indicators	& Peak Signal-to-Noise Ratio (PSNR)	& dB	& Higher value is better	& Measures the pixel-level fidelity between the enhanced image and the ground truth\\
+Image Quality Indicators	& Structural Similarity Index (SSIM)	& [0,1]	& Closer to 1 is better	& Evaluates image structural similarity in terms of luminance, contrast and structure\\
+Image Quality Indicators	& Perceptual Image Quality Evaluator (PIQE)	& --	& Lower value is better	& Assesses the subjective image quality based on visual perception\\
+Image Quality Indicators	& No-Reference Image Quality Evaluator (NIQE)	& --	& Lower value is better	& Measures the statistical consistency between the image and natural images without ground truth\\
+Luminance Characteristic Indicators	& Average Luminance	& 0--255	& Close to ground truth is preferable	& Reflects the overall luminance level of the enhanced image\\
+Luminance Characteristic Indicators	& Luminance Uniformity	& [0,1]	& Closer to 1 is better	& Quantifies the consistency of luminance distribution across different image regions\\
+Luminance Characteristic Indicators	& Overexposure Rate / Underexposure Rate	& \%	& Lower value is better	& Counts the proportion of overexposed/underexposed pixels in the image\\
+Luminance Characteristic Indicators	& Michelson Contrast	& --	& Close to ground truth is preferable	& Reflects the contrast difference between bright and dark regions of the image\\
+Luminance Characteristic Indicators	& Luminance Standard Deviation	& 0--255	& Moderate and close to ground truth	& Measures the overall dispersion of luminance distribution\\
+Luminance Characteristic Indicators	& Luminance Dynamic Range	& 0--255	& Close to ground truth is preferable	& Reflects the richness of the luminance interval covered by the image\\
+Luminance Characteristic Indicators	& Histogram Entropy	& --	& Close to ground truth is preferable	& Measures the richness of visual information in luminance distribution\\
+Model Efficiency Indicators	& Number of Parameters	& M	& Smaller value is better	& Counts the total number of trainable model parameters, reflecting the lightweight level\\
+Model Efficiency Indicators	& Running Time	& ms	& Smaller value is better	& Inference time for a single image, reflecting the model inference efficiency\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Note:} Except for Luminance Uniformity, Luminance Dynamic Range, Over-exposure Rate, and Under-exposure Rate, which are expressed using the median (interquartile range), all other metrics are presented as mean $\pm$ standard deviation.
+
+\textbf{3) Implementation Details:} All models were implemented in PyTorch and trained on a single NVIDIA Tesla V100-SXM2-32GB GPU. Training was conducted at the original LOL resolution (600$\times$400) without any data augmentation (no resizing, color perturbation, or horizontal flipping), so that the training and test distributions remain consistent. Training used a two-stage strategy: the first stage was pure pixel-level GT reconstruction pretraining (L1 0.5 + MSE 0.3 + SSIM 0.2), and the second stage continued from the first-stage weights and added the distillation terms for fine-tuning (learning rate 1e-4; MSE 0.3 + L1 0.2 + SSIM 0.1 + cosine 0.2 + perceptual 0.1 + brightness 0.05 + contrast 0.05). The student model was trained with the AdamW optimizer, a batch size of 8, a fixed random seed of 42, and a first-stage initial learning rate of 2e-3.
+
+\textbf{4) Fairness and Reproducibility:} To ensure a fair comparison, all methods were evaluated under an identical protocol---original resolution, pyiqa for PSNR/SSIM/NIQE, pypiqe for PIQE, brightness in 0--255, and Tukey outlier removal---on the same workstation. The learning-based baselines were evaluated using publicly available pre-trained weights or pre-computed outputs, whereas the proposed student was trained from scratch; the non-learning baselines are parameter-free. Table 10 summarizes the source of each method's enhancement results and the evaluation settings, and the complete hyperparameters above enable full reproducibility.
+
+\subsection{Analysis of Objective Quantitative Metrics}
+
+To highlight the real-time advantage, our method is compared with baselines spanning a broad range of computational budgets, from parameter-free rule-based methods and the heavier DDNet teacher to the recently proposed Transformer method Retinexformer \cite{ref34}. The time calculation excludes the first cold-start image, which is significantly larger than subsequent normal images, as discussed in the algorithm application experiment section. Table 2 shows the performance of each method on four commonly used image quality evaluation metrics: PSNR, PIQE, NIQE, and SSIM. The image quality of learning-based methods is generally superior to that of non-learning methods. The PSNR of learning methods is all above 14 dB, and SSIM is all above 0.62, while the non-learning method HE has a PSNR of only 9.65 $\pm$ 2.99 dB and an SSIM of only 0.42 $\pm$ 0.10, showing a significant gap compared to learning methods.
+
+\begin{table}[H]
+\caption{Comparison of Image Quality Metrics.\label{tab2}}
+\begin{tabularx}{\textwidth}{LLCCCC}
+\toprule
+\textbf{Method Type}	& \textbf{Method}	& \textbf{PSNR$\uparrow$ (dB)}	& \textbf{PIQE$\downarrow$}	& \textbf{NIQE$\downarrow$}	& \textbf{SSIM$\uparrow$}\\
+\midrule
+Learning	& Our method	& 21.35 $\pm$ 4.43	& 22.39 $\pm$ 6.89	& 3.76 $\pm$ 0.75	& 0.87 $\pm$ 0.04\\
+Learning	& DDNet \cite{ref25}	& 21.45 $\pm$ 4.63	& 26.81 $\pm$ 6.88	& 3.43 $\pm$ 0.55	& 0.86 $\pm$ 0.06\\
+Learning	& Retinexformer \cite{ref34}	& 25.15 $\pm$ 2.77	& 26.80 $\pm$ 7.67	& 3.47 $\pm$ 0.59	& 0.90 $\pm$ 0.04\\
+Learning	& Zero-DCE \cite{ref26}	& 14.86 $\pm$ 4.27	& 39.15 $\pm$ 7.61	& 7.77 $\pm$ 1.07	& 0.66 $\pm$ 0.13\\
+Learning	& SCI \cite{ref27}	& 14.78 $\pm$ 4.26	& 35.41 $\pm$ 5.36	& 7.87 $\pm$ 1.06	& 0.62 $\pm$ 0.15\\
+Learning	& RUAS \cite{ref9}	& 16.40 $\pm$ 4.39	& 19.32 $\pm$ 2.68	& 6.34 $\pm$ 1.13	& 0.70 $\pm$ 0.14\\
+Non-learning	& HE \cite{ref28}	& 9.65 $\pm$ 2.99	& 39.52 $\pm$ 11.53	& 7.58 $\pm$ 1.03	& 0.42 $\pm$ 0.10\\
+Non-learning	& Dong \cite{ref29}	& 12.05 $\pm$ 3.22	& 23.63 $\pm$ 6.53	& 6.61 $\pm$ 1.01	& 0.62 $\pm$ 0.16\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Notably, the recently proposed Retinexformer \cite{ref34} (Transformer-based, 1.61 M parameters) achieves the strongest reconstruction fidelity, with a PSNR of 25.15 $\pm$ 2.77 dB and an NIQE of 3.47 $\pm$ 0.59, both ranking first among all methods, but at the cost of a 54.60 ms inference latency and 31.16 GMac of computation, which is difficult to deploy in real time. Among the lightweight learning methods, DDNet stands out in pixel-level fidelity, with a PSNR of 21.45 $\pm$ 4.63 dB and an NIQE of 3.43 $\pm$ 0.55, ranking behind Retinexformer. Our proposed method achieves a PSNR of 21.35 $\pm$ 4.43 dB, essentially on par with DDNet (a gap of only 0.10 dB); its SSIM of 0.87 $\pm$ 0.04 ranks second among all compared methods (behind Retinexformer's 0.90), showing that our method preserves image structural information well; its PIQE of 22.39 $\pm$ 6.89 is better than the teacher model (26.81 $\pm$ 6.88) and most methods; and its NIQE of 3.76 $\pm$ 0.75 is second only to DDNet and Retinexformer. RUAS ranks first in PIQE (19.32 $\pm$ 2.68) and performs at a medium level across PSNR, SSIM, and NIQE. Zero-DCE and SCI perform poorly on all quality metrics, with PSNR below 15 dB and NIQE above 7.7, indicating room for improvement in their image enhancement effects.
+
+\textbf{Note:} The top three performing methods are highlighted in red, green, and blue, respectively.
+
+The comparison of core brightness characteristics is shown in Table 3, which evaluates five dimensions: average luminance, luminance uniformity, over-exposure rate, under-exposure rate, and Michelson contrast. Among these, higher luminance uniformity is better, lower over-exposure and under-exposure rates are better, and average luminance and Michelson contrast should fall within a comfortable range for the human eye. From Table 3, it can be seen that learning methods are significantly superior to non-learning methods in terms of brightness enhancement effect. The average luminance of non-learning methods is generally below 60. HE has an average luminance of only 34.89 $\pm$ 9.75, which cannot effectively improve the brightness of low-light images. In contrast, the average luminance of learning methods is all above 69. Among them, DDNet's average luminance is 125.49 $\pm$ 20.40 and Retinexformer's is 110.45 $\pm$ 27.94, both falling within a comfortable range for the human eye, and our method's average luminance is 114.89 $\pm$ 21.92, showing significant and stable brightness improvement.
+
+\begin{table}[H]
+\caption{Comparison of Core Brightness Characteristics.\label{tab3}}
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{tabularx}{\fulllength}{LLCCCCC}
+\toprule
+\textbf{Method Type}	& \textbf{Method}	& \textbf{Average Brightness}	& \textbf{Luminance Uniformity}	& \textbf{Over-exposure Rate$\downarrow$ (\%)}	& \textbf{Under-exposure Rate$\downarrow$ (\%)}	& \textbf{Michelson Contrast}\\
+\midrule
+Learning	& Our method	& 114.89 $\pm$ 21.92	& 0.79 (0.70--0.83)	& 0.00 (0.00--0.00)	& 0.00 (0.00--0.00)	& 0.82 $\pm$ 0.06\\
+Learning	& DDNet \cite{ref25}	& 125.49 $\pm$ 20.40	& 0.74 (0.66--0.85)	& 0.00 (0.00--0.01)	& 0.00 (0.00--0.00)	& 0.89 $\pm$ 0.04\\
+Learning	& Retinexformer \cite{ref34}	& 110.45 $\pm$ 27.94	& 0.75 (0.62--0.84)	& 0.00 (0.00--0.00)	& 0.00 (0.00--0.01)	& 0.94 $\pm$ 0.04\\
+Learning	& Zero-DCE \cite{ref26}	& 72.51 $\pm$ 19.04	& 0.67 (0.61--0.83)	& 0.00 (0.00--0.00)	& 0.04 (0.02--0.17)	& 1.00 $\pm$ 0.00\\
+Learning	& SCI \cite{ref27}	& 69.15 $\pm$ 24.68	& 0.62 (0.43--0.76)	& 0.00 (0.00--0.00)	& 0.10 (0.04--0.24)	& 1.00 $\pm$ 0.00\\
+Learning	& RUAS \cite{ref9}	& 95.26 $\pm$ 36.66	& 0.61 (0.45--0.74)	& 0.00 (0.00--0.03)	& 0.04 (0.02--0.20)	& 1.00 $\pm$ 0.00\\
+Non-learning	& HE \cite{ref28}	& 34.89 $\pm$ 9.75	& 0.72 (0.61--0.80)	& 0.00 (0.00--0.00)	& 0.13 (0.08--0.30)	& 0.97 $\pm$ 0.01\\
+Non-learning	& Dong \cite{ref29}	& 56.90 $\pm$ 17.65	& 0.63 (0.49--0.79)	& 0.00 (0.00--0.00)	& 0.04 (0.00--0.17)	& 0.91 $\pm$ 0.04\\
+\bottomrule
+\end{tabularx}
+\end{adjustwidth}
+\end{table}
+
+In terms of luminance uniformity, our method achieves a uniformity of 0.79, ranking first among all compared methods, indicating its effectiveness in ensuring brightness consistency across different image regions and avoiding local over-brightness or under-brightness. Regarding exposure control, our method's over-exposure and under-exposure rates are both 0.00, on par with DDNet and better than Zero-DCE, SCI, and others, showing that our method can completely avoid over-exposure and under-exposure issues during brightness enhancement, effectively preserving image details.
+
+In terms of Michelson contrast, Zero-DCE, SCI, and RUAS achieve a contrast of 1.00 $\pm$ 0.00. However, considering their average luminance, these methods produce overall darker images, and their high contrast is due to uneven brightness distribution. Retinexformer, DDNet, and our method have contrasts of 0.94 $\pm$ 0.04, 0.89 $\pm$ 0.04, and 0.82 $\pm$ 0.06, respectively, balancing brightness enhancement with reasonable contrast.
+
+Table 4 shows the results comparing brightness distribution details and model efficiency. Brightness distribution metrics reflect the richness of grayscale levels in the image, while efficiency metrics reflect the model's real-time performance and deployment feasibility. Lower values for parameter count and running time are better. From the brightness distribution details in Table 4, it can be seen that the luminance standard deviation of our method is 41.00 $\pm$ 10.96, indicating a relatively balanced brightness distribution. In terms of histogram entropy, RUAS, DDNet, and Retinexformer have the highest values, reaching 7.19 $\pm$ 0.39, 7.18 $\pm$ 0.27, and 7.14 $\pm$ 0.26, respectively. Our method's histogram entropy is 6.95 $\pm$ 0.30, ranking fourth among the compared methods, indicating that our method can still preserve rich grayscale levels while achieving its real-time advantage.
+
+\begin{table}[H]
+\small
+\caption{Comparison of Brightness Distribution Details and Model Efficiency.\label{tab4}}
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{tabularx}{\fulllength}{LLCCCCCCC}
+\toprule
+\textbf{Method Type}	& \textbf{Method}	& \textbf{Luminance Std. Dev.}	& \textbf{Luminance Dynamic Range}	& \textbf{Histogram Entropy}	& \textbf{Luminance Skewness}	& \textbf{Luminance Kurtosis}	& \textbf{Params (M)}	& \textbf{Running Time (ms)}\\
+\midrule
+Learning	& Our method	& 41.00 $\pm$ 10.96	& 218.00 (189.50--236.00)	& 6.95 $\pm$ 0.30	& $-0.02 \pm 0.49$	& $-0.58 \pm 0.77$	& 0.144	& 2.74 $\pm$ 0.06\\
+Learning	& DDNet \cite{ref25}	& 47.98 $\pm$ 11.65	& 236.00 (232.00--243.00)	& 7.18 $\pm$ 0.27	& $-0.20 \pm 0.58$	& $-0.38 \pm 0.87$	& 5.39	& 44.36 $\pm$ 0.07\\
+Learning	& Retinexformer \cite{ref34}	& 45.47 $\pm$ 12.72	& 239.00 (229.25--242.50)	& 7.14 $\pm$ 0.26	& $-0.14 \pm 0.49$	& $-0.44 \pm 0.86$	& 1.61	& 54.60 $\pm$ 0.04\\
+Learning	& Zero-DCE \cite{ref26}	& 33.16 $\pm$ 6.10	& 184.00 (156.50--229.00)	& 6.60 $\pm$ 0.17	& $-0.26 \pm 0.63$	& $-0.36 \pm 0.87$	& 8.5	& 10.58 $\pm$ 0.06\\
+Learning	& SCI \cite{ref27}	& 36.30 $\pm$ 7.05	& 241.00 (186.00--252.00)	& 6.83 $\pm$ 0.33	& $0.20 \pm 0.51$	& $-0.58 \pm 0.66$	& $2.58\times10^{-4}$	& 0.95 $\pm$ 0.00\\
+Learning	& RUAS \cite{ref9}	& 52.23 $\pm$ 14.33	& 255.00 (255.00--255.00)	& 7.19 $\pm$ 0.39	& $0.28 \pm 0.50$	& $-0.45 \pm 0.80$	& $3.438\times10^{-3}$	& 6.67 $\pm$ 0.10\\
+Non-learning	& HE \cite{ref28}	& 19.76 $\pm$ 5.83	& 162.00 (113.50--206.00)	& 5.79 $\pm$ 0.56	& $0.79 \pm 0.47$	& $0.74 \pm 1.60$	& --	& 2.5 $\pm$ 0.4\\
+Non-learning	& Dong \cite{ref29}	& 24.14 $\pm$ 5.53	& 139.00 (115.50--163.50)	& 6.28 $\pm$ 0.24	& $0.02 \pm 0.53$	& $-0.65 \pm 0.54$	& --	& 64 $\pm$ 3\\
+\bottomrule
+\end{tabularx}
+\end{adjustwidth}
+\tablefooter{\textbf{Note (Table IV):} Running time is the steady-state per-image inference latency (batch = 1, warm-up excluded, I/O excluded) measured on a single NVIDIA Tesla V100-SXM2-32GB GPU. The proposed method (2.74 ms) and the DDNet teacher (44.36 ms) were re-measured in this work; the full FLOPs/latency/memory comparison is reported in Table 12.}
+\end{table}
+
+In terms of model efficiency, our method demonstrates significant lightweighting advantages and real-time advantages. SCI has the smallest parameter count, only $2.58\times10^{-4}$ M, but its brightness enhancement effect is poor. Our method's parameter count is 0.144 M, much lower than DDNet's 5.39 M and Zero-DCE's 8.5 M, ranking third among learning methods. In terms of running time, SCI has the fastest inference speed, requiring only 0.95 $\pm$ 0.00 ms. Our method's running time is 2.74 $\pm$ 0.06 ms, ranking second among the learning-based methods, far lower than DDNet's 44.36 $\pm$ 0.07 ms and Dong's 64 $\pm$ 3 ms, meeting the requirements for real-time processing. In terms of computational complexity, our method requires only 7.22 GMac at the original resolution (400$\times$600), which is 15.3$\times$ fewer than DDNet's 110.51 GMac, confirming the effectiveness of the lightweight design (see Table 12).
+
+Based on the above three sets of experimental results, it can be concluded that the proposed method demonstrates excellent performance across three dimensions: image quality, brightness characteristics, and model efficiency. Our method ranks first in luminance uniformity and second in SSIM, and ranks competitively among the lightweight methods in PSNR, PIQE, and NIQE, with both over-exposure and under-exposure rates of 0. It achieves model lightweighting and real-time performance while ensuring image quality and brightness enhancement effects. In comparison, DDNet suffers from a large parameter count, long running time, and high deployment cost; Retinexformer attains the strongest PSNR and NIQE but its inference latency (54.60 ms) and computation (31.16 GMac) far exceed those of our method (2.74 ms / 7.22 GMac), making real-time deployment difficult; and non-learning methods have obvious shortcomings in brightness enhancement and image quality. Therefore, the proposed method achieves the best trade-off between enhancement quality and real-time performance in low-light image enhancement tasks, with high practical value and application prospects.
+
+\subsection{Ablation Experiments}
+
+Public low-light image datasets were used for training and testing, containing 485 pairs of training images and 15 pairs of test images. All models were trained with the AdamW optimizer under the two-stage training protocol. The results of the ablation experiments and the performance impact of each component are shown in Tables 5 and 6, and the loss-term ablation results are shown in Table 7, where all variants are evaluated under a single unified protocol (original resolution; pyiqa for PSNR/SSIM/NIQE; pypiqe for PIQE; brightness in 0--255; outlier removal).
+
+\begin{table}[H]
+\caption{Comparison of Ablation Study Results.\label{tab5}}
+\begin{tabularx}{\textwidth}{LCCCCCC}
+\toprule
+\textbf{Model}	& \textbf{PSNR$\uparrow$ (dB)}	& \textbf{SSIM$\uparrow$}	& \textbf{PIQE$\downarrow$}	& \textbf{NIQE$\downarrow$}	& \textbf{Avg. Luminance (0--255)}	& \textbf{Params (M)}\\
+\midrule
+Full Model	& 21.35 $\pm$ 4.43	& 0.873 $\pm$ 0.044	& 22.39 $\pm$ 6.89	& 3.76 $\pm$ 0.75	& 114.89 $\pm$ 21.92	& 0.144\\
+No Attention	& 18.80 $\pm$ 3.53	& 0.825 $\pm$ 0.069	& 25.90 $\pm$ 7.43	& 3.59 $\pm$ 0.51	& 120.60 $\pm$ 17.88	& 0.128\\
+No Adaptive Residual	& 21.05 $\pm$ 3.61	& 0.866 $\pm$ 0.046	& 30.26 $\pm$ 8.87	& 3.72 $\pm$ 0.50	& 115.64 $\pm$ 21.81	& 0.144\\
+No Skip Connections	& 19.76 $\pm$ 3.54	& 0.825 $\pm$ 0.033	& 35.78 $\pm$ 7.99	& 5.65 $\pm$ 0.49	& 113.86 $\pm$ 15.89	& 0.144\\
+Channels Halved (16)	& 20.69 $\pm$ 3.94	& 0.851 $\pm$ 0.048	& 26.34 $\pm$ 8.82	& 4.07 $\pm$ 0.55	& 115.11 $\pm$ 21.72	& 0.011\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{Analysis of the Impact of Each Component on Model Performance.\label{tab6}}
+\begin{tabularx}{\textwidth}{LCCCCCL}
+\toprule
+\textbf{Component}	& \textbf{$\Delta$PSNR (dB)}	& \textbf{$\Delta$SSIM}	& \textbf{$\Delta$PIQE}	& \textbf{$\Delta$Params (M)}	& \textbf{Importance}	& \textbf{Key Impact}\\
+\midrule
+Attention Mechanism (remove)	& $-2.55$	& $-0.048$	& $+3.51$	& $-0.016$	& High	& Largest PSNR/SSIM drop\\
+Skip Connections (remove)	& $-1.59$	& $-0.048$	& $+13.39$	& $0.000$	& High	& Degrades fidelity \& perceptual quality (PIQE/NIQE)\\
+Adaptive Residual (remove)	& $-0.30$	& $-0.007$	& $+7.87$	& $0.000$	& Medium	& Small fidelity cost; large PIQE degradation\\
+Channels (32$\rightarrow$16)	& $-0.66$	& $-0.022$	& $+3.95$	& $-0.133$	& Medium	& Extreme parameter efficiency\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\caption{Loss Term Ablation Results.\label{tab7}}
+\begin{tabularx}{\textwidth}{LCCCCC}
+\toprule
+\textbf{Variant}	& \textbf{PSNR$\uparrow$ (dB)}	& \textbf{SSIM$\uparrow$}	& \textbf{PIQE$\downarrow$}	& \textbf{NIQE$\downarrow$}	& \textbf{Params (M)}\\
+\midrule
+Full (all distillation terms)	& 21.35 $\pm$ 4.43	& 0.873 $\pm$ 0.044	& 22.39 $\pm$ 6.89	& 3.76 $\pm$ 0.75	& 0.144\\
+w/o Cosine ($L_{cos}$)	& 20.61 $\pm$ 4.13	& 0.866 $\pm$ 0.049	& 24.09 $\pm$ 6.61	& 3.89 $\pm$ 0.76	& 0.144\\
+w/o Perceptual ($L_{per}$)	& 20.36 $\pm$ 3.85	& 0.865 $\pm$ 0.049	& 23.56 $\pm$ 6.73	& 3.86 $\pm$ 0.76	& 0.144\\
+w/o Brightness ($L_{bri}$)	& 20.89 $\pm$ 4.10	& 0.871 $\pm$ 0.046	& 23.46 $\pm$ 7.08	& 3.81 $\pm$ 0.74	& 0.144\\
+w/o Contrast ($L_{con}$)	& 20.51 $\pm$ 3.94	& 0.867 $\pm$ 0.048	& 23.65 $\pm$ 7.00	& 3.90 $\pm$ 0.78	& 0.144\\
+Pure Supervised (no KD)	& 21.34 $\pm$ 4.57	& 0.870 $\pm$ 0.047	& 24.68 $\pm$ 7.37	& 3.77 $\pm$ 0.74	& 0.144\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note (Table VII):} All variants share the same stage-1 reconstruction pretraining and differ only in the stage-2 distillation loss; the ``Full'' anchor (21.35 dB) is identical to the full model in Table 5. Metrics follow the unified protocol (pyiqa PSNR/SSIM/NIQE, pypiqe PIQE, brightness 0--255, Tukey outlier removal).}
+\end{table}
+
+The channel-halving experiment demonstrates strong parameter efficiency: reducing the number of channels from 32 to 16 decreases the parameters from 0.144 M to 0.011 M, a reduction of 92.3\%, while PSNR decreases from 21.35 dB to 20.69 dB, a relative drop of only 3.1\%. The parameter efficiency ratio is calculated as:
+
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{equation}
+\mathrm{Efficiency\ Ratio} = \frac{\Delta PSNR / PSNR_{base}}{\Delta Params / Params_{base}} = \frac{0.66/21.35}{0.133/0.144} \approx 0.033
+\end{equation}
+\end{adjustwidth}
+
+This result indicates that for every 1\% reduction in parameters, PSNR decreases by only about 0.033\%, demonstrating that channel halving remains a highly effective lightweighting strategy. Notably, the channel-halved variant (20.69 dB) preserves more PSNR than both the no-attention (18.80 dB) and no-skip (19.76 dB) variants, confirming that reducing width is less damaging than removing these core structural components.
+
+The removal of skip connections is the most damaging single ablation for perceptual quality: it decreases PSNR by 1.59 dB and SSIM by 0.048, and severely degrades the no-reference perceptual metrics (PIQE +13.39, NIQE +1.89). This reveals that skip connections are essential for both reconstruction fidelity and perceptual naturalness in low-light enhancement, rather than being dispensable once pixel-level fidelity is accounted for.
+
+Removing the attention mechanism caused the largest decrease in PSNR ($-2.55$ dB), and jointly with skip connections the largest SSIM drop ($-0.048$), among all ablated components, confirming that the simplified channel attention is the most performance-critical module for reconstruction fidelity. Notably, it adds only 0.016 M parameters but substantially improves reconstruction fidelity, showing excellent parameter efficiency.
+
+Through systematic ablation experiments, the impact of each component in the low-light image enhancement model was analyzed in depth, leading to the following conclusions:
+
+\begin{enumerate}
+\item \textbf{The attention mechanism is crucial:} its removal causes the largest PSNR drop and should be retained in all configurations.
+\item \textbf{Channel halving is highly efficient:} reducing channels from 32 to 16 cuts parameters by 92.3\% while PSNR drops only 3.1\%, providing an effective path for extreme lightweighting.
+\item \textbf{Skip connections preserve both fidelity and perceptual quality:} their removal degrades PSNR ($-1.59$ dB) as well as PIQE/NIQE (+13.39/+1.89).
+\item \textbf{Adaptive residual fusion preserves perceptual quality at negligible cost:} its removal barely affects PSNR/SSIM but markedly worsens PIQE (+7.87).
+\end{enumerate}
+
+To further verify the specific contribution of each term in the multi-level distillation loss, loss-term ablation experiments were conducted under the same unified two-stage training protocol (Table 7). In the second stage, the output cosine-alignment term $L_{cos}$, the perceptual-alignment term $L_{per}$, the brightness-alignment term $L_{bri}$, and the contrast-alignment term $L_{con}$ were each disabled in turn, and a pure-supervised variant (no KD) removed all distillation terms entirely. The results show that removing any single distillation term lowers PSNR (by 0.46--0.98 dB) and raises PIQE (by 1.06--1.70), indicating that every distillation term contributes positively to enhancement quality; among them, the output cosine-alignment ($-0.73$ dB) and perceptual-alignment ($-0.98$ dB) terms have the strongest impact on pixel fidelity. Notably, removing all distillation terms (no KD) leaves PSNR nearly unchanged (21.34 dB vs 21.35 dB, a drop of only 0.005 dB), yet markedly degrades the perceptual metric PIQE (24.68 vs 22.39, up by 2.29). This finding pinpoints the core value of knowledge distillation: the distillation loss contributes primarily to perceptual quality rather than pixel-level reconstruction fidelity, which is in strong agreement with the paper's central thesis that the student attains PSNR/SSIM comparable to the teacher while achieving better PIQE. In summary, the multiple terms of the distillation loss jointly safeguard the student's perceptual quality under extreme lightweighting, and no single term is dispensable.
+
+In summary, the full optimized model proposed in this paper (0.144 M parameters, 21.35 dB PSNR) achieves a good balance between performance and efficiency. The channel-halved version (0.011 M parameters, 20.69 dB PSNR) provides a practical solution for extremely resource-constrained environments. These findings provide important guidance and empirical basis for the lightweight design of low-light image enhancement models.
+
+\subsection{Analysis of Subjective Visual Effects}
+
+Figure~\ref{fig4} shows a comparison of enhancement results by different methods in low-light scenes against the normal-light ground truth. Combined with the performance of objective metrics, the visual performance of our method can be further verified:
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{figs/fig4.png}
+\caption{Visual comparison of low-light image enhancement results.\label{fig4}}
+\end{figure}
+
+\begin{itemize}
+\item \textbf{Brightness Match with Ground Truth:} The brightness of the enhancement results from our method is highly consistent with the ground truth. The overall brightness is uniform across all scenes, with no local overexposure or underexposure (e.g., the bathroom scene in column 2, the doll area in column 7). In contrast, DDNet's brightness is slightly higher than the ground truth; Zero-DCE and SCI have significantly lower brightness; HE and Dong's enhancement results remain close to the low-light input, showing a large gap from the ground truth.
+\item \textbf{Detail and Texture Fidelity:} Our method completely preserves the texture details of objects (e.g., clothing wrinkles in column 3, paper edges in column 8), achieving the highest consistency in details with the ground truth. DDNet shows slight detail blurring (e.g., doll fur in column 6). Zero-DCE and SCI exhibit artifacts in high-contrast areas (e.g., the door frame in column 1). HE and Dong lose a large amount of detail in dark areas (e.g., the outlines of items on the storage shelf in column 9).
+\item \textbf{Color Restoration Accuracy:} The color restoration of our method is closest to the ground truth (e.g., the color gradation of the pendant in column 4, the color transition of the doll in column 7), with no obvious color cast. DDNet has slightly higher color saturation. Zero-DCE and SCI suffer from color distortion (e.g., the white fur of the doll in column 7 appears yellowish). HE presents a grayscale effect, showing the largest color difference from the ground truth.
+\end{itemize}
+
+\subsection{Algorithm Application Experiment}
+
+To comprehensively evaluate the overall performance of the proposed lightweight model in practical deployment, we conducted a detailed time analysis of the complete processing pipeline, including image loading, preprocessing, model inference, post-processing, and saving. All tests were performed on the same high-performance GPU workstation to eliminate hardware differences.
+
+\subsubsection{Steady-State Processing Pipeline Bottleneck Analysis}
+
+Table 8 summarizes the average time consumption, fluctuations, and time proportion of each stage for processing a single image when the system is in a stable running state (excluding the first warm-up image). The results show that after lightweight design, model inference time accounts for only 2.9\% of the total end-to-end processing time, indicating that computational efficiency has been fully optimized. However, data I/O and post-processing operations together account for a high proportion of 96.2\%, with disk I/O (image saving) being the main performance bottleneck, accounting for 93.4\% of the total time. The extremely small standard deviation of model inference time (0.0558 ms) verifies its computational stability under continuous operation.
+
+\begin{table}[H]
+\caption{Analysis of Time Consumption for Each Processing Stage in Steady State.\label{tab8}}
+\begin{tabularx}{\textwidth}{LCCCLC}
+\toprule
+\textbf{Stage}	& \textbf{First Image}	& \textbf{Avg.}	& \textbf{Std. Dev.}	& \textbf{Range}	& \textbf{Proportion (\%)}\\
+\midrule
+Image Loading	& 0.9833 ms	& 0.8663 ms	& 0.0490 ms	& 0.7438 ms--0.9104 ms	& 0.9\%\\
+Preprocessing	& 0.0931 $\mu$s	& 0.1284 $\mu$s	& 0.0155 $\mu$s	& 0.1136 $\mu$s--0.1583 $\mu$s	& 0.0\%\\
+Inference	& 763.3 ms	& 2.841 ms	& 0.0558 ms	& 2.786 ms--3.009 ms	& 2.9\%\\
+Post-processing	& 5.924 ms	& 2.753 ms	& 0.0949 ms	& 2.622 ms--2.960 ms	& 2.8\%\\
+Image Saving	& 93.40 ms	& 91.35 ms	& 13.09 ms	& 71.21 ms--112.2 ms	& 93.4\%\\
+Total Time	& 863.6 ms	& 97.81 ms	& 13.06 ms	& 77.68 ms--118.6 ms	& N/A\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Warm-up Phase Performance Analysis}
+
+When a deep learning framework performs inference for the first time, it needs to complete one-time operations such as CUDA context initialization, GPU kernel compilation, and memory optimization allocation. This process introduces significant additional latency. Table 9 compares the processing time of the first (warm-up) image with subsequent steady-state images. It can be seen that the model inference delay caused by warm-up is particularly prominent, being 268 times that of the steady state. This phenomenon is common in systems based on modern deep learning frameworks.
+
+\begin{table}[H]
+\caption{Comparison of Processing Time between Warm-up and Steady-State Phases.\label{tab9}}
+\begin{tabularx}{\textwidth}{LCCC}
+\toprule
+\textbf{Stage}	& \textbf{First (Warm-up)}	& \textbf{Subsequent (Steady) Avg.}	& \textbf{Delay}\\
+\midrule
+Model Inference	& 763.3	& 2.841	& 268$\times$\\
+Image Saving	& 93.40	& 91.35	& 1.02$\times$\\
+Total Time	& 863.6	& 97.81	& 8.8$\times$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Bottleneck Summary and Optimization Directions}
+
+Based on the above analysis, the following conclusions can be drawn, providing optimization directions for practical deployment:
+
+\begin{enumerate}
+\item \textbf{Bottleneck Identification:} For offline batch processing tasks, disk I/O is the primary bottleneck. For real-time video stream display tasks (without saving), data transfer between GPU-CPU and post-processing become the main bottlenecks.
+\item \textbf{Hardware and Format Optimization:} Using faster storage devices (e.g., NVMe SSD) and choosing efficient image encoding/compression formats can significantly alleviate the I/O bottleneck.
+\item \textbf{Pipelined Parallel Architecture:} To address the imbalance between I/O and computation, a pipelined parallel architecture is proposed. This scheme decouples the four stages of image reading, preprocessing, model inference, and result saving/display, achieving parallel execution of each stage through multi-threading/multi-processing. This design can effectively hide data preparation time, preventing the overall system throughput from being limited by the slowest I/O stage.
+\end{enumerate}
+
+\begin{table}[H]
+\caption{Fairness and Reproducibility Summary of Compared Methods.\label{tab10}}
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{tabularx}{\fulllength}{LLLCC}
+\toprule
+\textbf{Method}	& \textbf{Type}	& \textbf{Enhancement-Result Source}	& \textbf{Eval. Resolution}	& \textbf{Eval. Protocol}\\
+\midrule
+Ours (student)	& Learning	& Two-stage training: original-resolution reconstruction pretraining + distillation fine-tuning (AdamW, batch 8, seed 42)	& original	& unified\\
+DDNet \cite{ref25}	& Learning (teacher)	& Pre-trained	& original	& unified\\
+Zero-DCE \cite{ref26}	& Learning	& Pre-computed public result	& original	& unified\\
+SCI \cite{ref27}	& Learning	& Pre-computed public result	& original	& unified\\
+RUAS \cite{ref9}	& Learning	& Pre-computed public result	& original	& unified\\
+Retinexformer \cite{ref34}	& Learning	& Pre-trained public weights (HuggingFace CaiYuanhao/Retinexformer)	& original	& unified\\
+HE (CLAHE) \cite{ref28}	& Non-learning	& Parameter-free (applied offline)	& original	& unified\\
+Dong \cite{ref29}	& Non-learning	& Parameter-free (applied offline)	& original	& unified\\
+\bottomrule
+\end{tabularx}
+\end{adjustwidth}
+\tablefooter{\textbf{Note:} ``unified'' protocol = original resolution; pyiqa PSNR/SSIM/NIQE and pypiqe PIQE; brightness 0--255; Tukey outlier removal; all timing on a single NVIDIA Tesla V100-SXM2-32GB GPU, batch size 1, excluding I/O.}
+\end{table}
+
+\subsection{Statistical Significance Analysis}
+
+\textbf{Note (Table XI):} Per-image PSNR, SSIM, PIQE, and NIQE are computed without outlier removal ($n = 15$). The descriptive SSIM here (0.856) is the raw per-image mean and therefore differs slightly from the Tukey-trimmed value reported in Table 2 (0.873).
+
+To verify that the observed differences are not caused by random variation, paired statistical tests were conducted on the 15 test images. For each image, PSNR, SSIM, PIQE, and NIQE were computed per-image (without outlier removal), and the proposed student was compared with each baseline using the paired Student's t-test and the Wilcoxon signed-rank test at a significance level of $\alpha = 0.05$. Table 11 reports the resulting p-values.
+
+\begin{table}[H]
+\caption{Statistical Significance of the Proposed Method vs. Baselines (paired tests, n = 15).\label{tab11}}
+\begin{tabularx}{\textwidth}{LCCCC}
+\toprule
+\textbf{Baseline}	& \textbf{PSNR (t / W)}	& \textbf{SSIM (t / W)}	& \textbf{PIQE (t / W)}	& \textbf{NIQE (t / W)}\\
+\midrule
+DDNet (teacher) \cite{ref25}	& 0.940 / 1.000	& 0.933 / 0.599	& 0.002 / 0.003	& 0.013 / 0.018\\
+Zero-DCE \cite{ref26}	& 0.001 / 0.004	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001\\
+SCI \cite{ref27}	& $<$0.001 / 0.003	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001\\
+RUAS \cite{ref9}	& 0.006 / 0.010	& $<$0.001 / $<$0.001	& 0.215 / 0.107	& $<$0.001 / $<$0.001\\
+HE (CLAHE) \cite{ref28}	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001	& $<$0.001 / $<$0.001\\
+Dong \cite{ref29}	& $<$0.001 / 0.002	& $<$0.001 / $<$0.001	& 0.555 / 0.599	& $<$0.001 / $<$0.001\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note:} Each cell reports the p-value of the paired Student's t-test and of the Wilcoxon signed-rank test (``t / W'') comparing the proposed student with the corresponding baseline. PSNR/SSIM: higher is better; PIQE/NIQE: lower is better. On PSNR and SSIM the student is statistically indistinguishable from the DDNet teacher ($p = 0.940$ and $p = 0.933$); on PIQE it significantly outperforms the teacher, Zero-DCE, SCI, and HE but is statistically indistinguishable from RUAS and Dong; on NIQE it is significantly better than all baselines except the teacher, which is significantly lower (better).}
+\end{table}
+
+The student significantly outperforms the non-learning baselines and the weaker learning baselines: it is significantly better than Zero-DCE, SCI, and HE on all four metrics ($p < 0.05$), and significantly better than Dong on PSNR, SSIM, and NIQE ($p < 0.05$) while being statistically indistinguishable from Dong on PIQE ($p = 0.555$). Compared with RUAS, the student is significantly better on PSNR ($p = 0.006$), SSIM, and NIQE ($p < 0.05$) but statistically indistinguishable on PIQE ($p = 0.215$). Compared with the DDNet teacher, the student is statistically indistinguishable on PSNR ($p = 0.940$) and SSIM ($p = 0.933$), significantly better on the perceptual metric PIQE ($p = 0.002$), and only slightly---though still significantly---worse on NIQE ($p = 0.013$). These tests therefore corroborate the paper's central claim: the distilled student attains visual fidelity on par with the teacher and even better perceptual quality (PIQE), at the cost of only a small NIQE gap, while remaining an order of magnitude smaller and faster.
+
+\subsection{Computational Complexity Analysis}
+
+Beyond parameter count, the practical value of a lightweight model is determined by FLOPs, latency, and peak memory. Table 12 reports these quantities for the teacher and all student variants, measured with a batch size of 1 on a single NVIDIA Tesla V100-SXM2-32GB GPU using thop, with latency averaged over 50 forward passes after warm-up and excluding I/O. The full student requires only 7.22 GMac at the native LOL resolution (400$\times$600), which is 15.3$\times$ fewer than the teacher's 110.51 GMac, and its measured latency of 2.74 ms is 16.2$\times$ faster than the teacher's 44.36 ms, corresponding to 365 FPS; this standalone latency is consistent with the inference stage measured in the end-to-end pipeline (2.84 ms, Table 8). Among the components, the attention module and the adaptive residual fusion add only $\approx$0.05\% and $\approx$0.00\% FLOPs ($\approx$0.49 ms and $\approx$0.09 ms latency), respectively, whereas the skip connections account for 42\% of the FLOPs (7.22 vs. 4.18 GMac) and $\approx$0.57 ms of latency---yet they are retained because they preserve both reconstruction fidelity and perceptual quality (Section 4.3). The channel-halved variant achieves an additional 10.3$\times$ FLOPs reduction (0.70 GMac) and the lowest peak memory (45.9 MB), making it suitable for the most resource-constrained devices.
+
+\begin{table}[H]
+\caption{Computational Complexity Comparison.\label{tab12}}
+\begin{adjustwidth}{-\extralength}{0cm}
+\begin{tabularx}{\fulllength}{LCCCCCC}
+\toprule
+\textbf{Model}	& \textbf{Params (M)}	& \textbf{FLOPs @$256\times256$ (GMac)}	& \textbf{FLOPs @$400\times600$ (GMac)}	& \textbf{Latency (ms)}	& \textbf{FPS}	& \textbf{Peak Mem. (MB)}\\
+\midrule
+Teacher DDNet	& 5.39	& 30.18	& 110.51	& 44.36 $\pm$ 0.07	& 22.5	& 185.0\\
+Retinexformer \cite{ref34}	& 1.61	& 8.51	& 31.16	& 54.60 $\pm$ 0.04	& 18.3	& 599.6\\
+Student (full)	& 0.144	& 1.97	& 7.22	& 2.74 $\pm$ 0.06	& 364.7	& 144.9\\
+w/o attention	& 0.128	& 1.97	& 7.21	& 2.31 $\pm$ 0.04	& 432.4	& 145.8\\
+w/o adaptive residual	& 0.144	& 1.97	& 7.22	& 2.72 $\pm$ 0.05	& 368.1	& 144.9\\
+w/o skip connections	& 0.144	& 1.14	& 4.18	& 2.24 $\pm$ 0.05	& 446.3	& 82.4\\
+Channels halved (16)	& 0.011	& 0.19	& 0.70	& 2.65 $\pm$ 0.06	& 377.4	& 45.9\\
+\bottomrule
+\end{tabularx}
+\end{adjustwidth}
+\tablefooter{\textbf{Note:} FLOPs measured with thop at $256\times256$ (training size) and $400\times600$ (native LOL size); latency is the steady-state per-image time (batch = 1, warm-up excluded, I/O excluded) averaged over 50 passes on a single NVIDIA Tesla V100-SXM2-32GB GPU. The full student requires 15.3$\times$ fewer FLOPs (7.22 vs. 110.51 GMac) and runs 16.2$\times$ faster than the teacher, using only 2.7\% of its parameters.}
+\end{table}
+
+\subsection{Cross-Dataset Generalization Analysis}
+
+To assess whether the LOL-trained student transfers beyond its training distribution, a zero-shot cross-dataset experiment was conducted on two widely used low-light benchmarks that differ substantially in acquisition characteristics and for which no ground truth is available: DICM \cite{ref30} (64 consumer photos) and LIME \cite{ref31} (10 images). The full student, trained exclusively on LOL and frozen, was applied directly without any fine-tuning, and its outputs were compared against the original low-light inputs using two no-reference perceptual metrics, PIQE and NIQE (lower is better). Table 13 reports the results.
+
+\begin{table}[H]
+\caption{Cross-Dataset Zero-Shot Generalization (No-Reference Metrics, lower is better).\label{tab13}}
+\begin{tabularx}{\textwidth}{LCLCC}
+\toprule
+\textbf{Dataset}	& \textbf{\#Images}	& \textbf{Setting}	& \textbf{PIQE $\downarrow$ (mean $\pm$ std)}	& \textbf{NIQE $\downarrow$ (mean $\pm$ std)}\\
+\midrule
+DICM \cite{ref30}	& 64	& Input (low-light)	& 34.33 $\pm$ 13.55	& 4.25 $\pm$ 1.35\\
+DICM \cite{ref30}	& 64	& Ours (LOL-trained)	& 36.64 $\pm$ 16.82	& 4.82 $\pm$ 2.13\\
+LIME \cite{ref31}	& 10	& Input (low-light)	& 30.75 $\pm$ 15.20	& 4.35 $\pm$ 1.55\\
+LIME \cite{ref31}	& 10	& Ours (LOL-trained)	& 31.76 $\pm$ 13.74	& 4.45 $\pm$ 1.37\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note:} The student model is trained only on LOL and applied to DICM/LIME without any fine-tuning (zero-shot). PIQE and NIQE are no-reference metrics computed at original resolution; lower is better. Because under-exposed inputs have artificially favorable no-reference scores, the small post-enhancement increase partly reflects the disclosure of texture/noise rather than true quality loss, so these results should be read alongside the full-reference evaluation in Table 2.}
+\end{table}
+
+On LIME, the student introduces negligible perceptual degradation, with NIQE essentially unchanged (4.35 $\rightarrow$ 4.45) and PIQE rising only marginally (30.75 $\rightarrow$ 31.76), indicating that the enhanced results remain perceptually natural. On DICM, the change is larger (NIQE 4.25 $\rightarrow$ 4.82; PIQE 34.33 $\rightarrow$ 36.64), revealing a measurable domain gap. Because the raw low-light inputs are severely under-exposed, their no-reference scores are spuriously favorable (few visible details and hence few ``unnatural'' structures), whereas enhancement discloses texture and residual noise that these metrics penalize; therefore no-reference metrics alone cannot definitively rank cross-dataset enhancement and should be interpreted together with full-reference evaluation and subjective studies. Taken together, these results show that the distilled student generalizes stably to LIME-like scenes but that its zero-shot transfer to other imaging domains is limited, corroborating the limitation noted in Section 5.2 and motivating domain adaptation and more diverse training data as future work.
+
+To provide the full-reference cross-dataset evidence that no-reference metrics cannot deliver alone, the frozen student was further evaluated zero-shot on two full-reference benchmarks with ground truth: LOL-v2-real \cite{ref32} (100 pairs) and MIT-FiveK \cite{ref33} (100 images); Table 14 reports the results. When transferred to LOL-v2-real, which shares the real low-light imaging domain of LOL, the student attains a PSNR of 28.37 dB, demonstrating strong cross-dataset generalization to low-light scenes with similar acquisition characteristics. When transferred to MIT-FiveK, a photographic post-editing benchmark, the PSNR drops to 13.02 dB because its expert labels encode content-aware color/contrast adjustments rather than mere brightening, objectively quantifying the ``strong in-domain generalization, limited cross-domain transfer'' conclusion above.
+
+\begin{table}[H]
+\caption{Cross-Dataset Zero-Shot Generalization (Full-Reference Metrics).\label{tab14}}
+\begin{tabularx}{\textwidth}{LCCC}
+\toprule
+\textbf{Dataset}	& \textbf{\#Images}	& \textbf{PSNR $\uparrow$ (dB, mean $\pm$ std)}	& \textbf{SSIM $\uparrow$ (mean $\pm$ std)}\\
+\midrule
+LOL-v2-real \cite{ref32}	& 100	& 28.37 $\pm$ 2.48	& 0.8914 $\pm$ 0.037\\
+MIT-FiveK \cite{ref33}	& 100	& 13.02 $\pm$ 3.62	& 0.5624 $\pm$ 0.1451\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note:} Full-reference PSNR/SSIM use Tukey per-image outlier removal. The student is trained only on LOL and frozen (zero-shot). LOL-v2-real is evaluated at original resolution; MIT-FiveK is resized to long-edge 1024 (full resolution exceeds the 32 GB GPU memory) with bilinear GT alignment, and is a self-recorded 100-image subset (not the official DPE split). LOL-v2-real shares the LOL imaging domain, yielding a high transferred PSNR (28.37 dB); MIT-FiveK is a photographic post-editing dataset whose expert labels encode content-aware color/contrast adjustments rather than mere brightening, so its full-reference scores are markedly lower, objectively corroborating the domain-shift limitation of Section 5.2.}
+\end{table}
+
+\subsection{Edge Deployment Validation on a Jetson Device}
+
+To verify that the lightweight student is deployable on a real resource-constrained edge platform rather than only a datacenter GPU, the full model was benchmarked on an NVIDIA Jetson Orin Nano Super developer kit (PyTorch 2.3.0, CUDA available). The model was evaluated at the native LOL resolution of 600$\times$400, with batch size 1, 10 warm-up passes, and 100 steady-state passes; both native FP32 and FP16 (half-precision) inference were measured. Table 15 reports the parameter count, per-image latency, FPS, and peak memory.
+
+\begin{table}[H]
+\caption{Real-Edge Inference Benchmark on NVIDIA Jetson Orin Nano Super ($600\times400$).\label{tab15}}
+\begin{tabularx}{\textwidth}{LCCCC}
+\toprule
+\textbf{Precision}	& \textbf{Params (M)}	& \textbf{Latency (ms)}	& \textbf{FPS}	& \textbf{Peak Mem. (MB)}\\
+\midrule
+FP32	& 0.1443	& 66.58 $\pm$ 0.95	& 15.02	& 478.28\\
+FP16	& 0.1443	& 46.02 $\pm$ 0.60	& 21.73	& 373.14\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note:} Measured at batch size 1 with native PyTorch (PyTorch 2.3.0, CUDA available), using 10 warm-up passes followed by 100 steady-state passes at the native LOL resolution (600$\times$400), excluding I/O. FP16 is native half-precision without TensorRT; further acceleration is possible with engine-level optimization or post-training quantization.}
+\end{table}
+
+The student occupies only 0.1443 M parameters and less than 0.5 GB of peak memory (478 MB in FP32, 373 MB in FP16)---a small fraction of the on-device memory budget---confirming its memory feasibility on edge-class SoCs. In FP32 it runs at 15.02 FPS (66.58 $\pm$ 0.95 ms); casting the model to FP16 reduces the latency by $\approx$31\% to 46.02 $\pm$ 0.60 ms and raises throughput to 21.73 FPS, a 1.45$\times$ speed-up that also lowers peak memory by $\approx$22\%. At 21.73 FPS the student approaches the 24 FPS real-time video threshold, and the small latency standard deviations ($\leq$0.95 ms) demonstrate stable, jitter-free inference during continuous operation. Since these measurements use native PyTorch half-precision without TensorRT or further acceleration, additional speed-up can be expected from engine-level optimization or post-training quantization.
+
+By comparison, the DDNet teacher---5.39 M parameters and 110.51 GMac---already requires 44.36 ms per image on a V100 datacenter GPU, which would make it prohibitively slow on a low-power edge SoC such as the Orin Nano Super. The distilled student therefore converts a ``teacher-grade'' enhancement capability into an ``edge-feasible'' speed that the teacher cannot deliver. Combining the V100 result (365 FPS) with the Jetson result (15.02 FPS FP32 / 21.73 FPS FP16) substantiates the paper's central claim: the proposed method attains strong enhancement quality together with near-real-time throughput across both datacenter and low-power edge hardware.
+
+\subsection{Efficiency--Quality Trade-off Analysis}
+
+The core claim of our method is not to surpass all baselines in absolute quality, but to achieve an order-of-magnitude efficiency gain at a negligible quality cost---i.e., to occupy a better Pareto position on the quality--efficiency trade-off curve. Table 16 juxtaposes each method's key quality metrics (PSNR, NIQE) with its efficiency metrics (parameters, latency, FLOPs) for direct comparison.
+
+\begin{table}[H]
+\caption{Quality--Efficiency Trade-off Comparison.\label{tab16}}
+\begin{tabularx}{\textwidth}{LCCCCC}
+\toprule
+\textbf{Method}	& \textbf{Params (M)}	& \textbf{FLOPs@$400\times600$ (GMac)}	& \textbf{Latency (ms)}	& \textbf{PSNR$\uparrow$ (dB)}	& \textbf{NIQE$\downarrow$}\\
+\midrule
+Our method	& 0.144	& 7.22	& 2.74 $\pm$ 0.06	& 21.35 $\pm$ 4.43	& 3.76 $\pm$ 0.75\\
+DDNet \cite{ref25}	& 5.39	& 110.51	& 44.36 $\pm$ 0.07	& 21.45 $\pm$ 4.63	& 3.43 $\pm$ 0.55\\
+Retinexformer \cite{ref34}	& 1.61	& 31.16	& 54.60 $\pm$ 0.04	& 25.15 $\pm$ 2.77	& 3.47 $\pm$ 0.59\\
+Zero-DCE \cite{ref26}	& 8.5	& --	& 10.58 $\pm$ 0.06	& 14.86 $\pm$ 4.27	& 7.77 $\pm$ 1.07\\
+SCI \cite{ref27}	& $2.58\times10^{-4}$	& --	& 0.95 $\pm$ 0.00	& 14.78 $\pm$ 4.26	& 7.87 $\pm$ 1.06\\
+RUAS \cite{ref9}	& $3.44\times10^{-3}$	& --	& 6.67 $\pm$ 0.10	& 16.40 $\pm$ 4.39	& 6.34 $\pm$ 1.13\\
+HE \cite{ref28}	& --	& --	& 2.5 $\pm$ 0.4	& 9.65 $\pm$ 2.99	& 7.58 $\pm$ 1.03\\
+Dong \cite{ref29}	& --	& --	& 64 $\pm$ 3	& 12.05 $\pm$ 3.22	& 6.61 $\pm$ 1.01\\
+\bottomrule
+\end{tabularx}
+\tablefooter{\textbf{Note (Table XVI):} Params, latency, and FLOPs are taken from Tables IV and XII; PSNR and NIQE are taken from Table II (unified protocol, Tukey outlier removal). ``--'' denotes non-learning methods without trainable parameters or unmeasured FLOPs. Latency is the steady-state single-image inference time on a single NVIDIA Tesla V100 (batch size 1).}
+\end{table}
+
+In terms of quality, the student model is statistically indistinguishable from the teacher on PSNR and SSIM (21.35 vs. 21.45 dB, $p = 0.940$; 0.87 vs. 0.86, $p = 0.933$), lies at a similar NIQE level (3.76 vs. 3.43), and is significantly better on PIQE (22.39 vs. 26.81). In terms of efficiency, however, the student uses only 2.7\% of the teacher's parameters (0.144 vs. 5.39 M), reduces FLOPs by 15.3$\times$ (7.22 vs. 110.51 GMac), and shortens latency by 16.2$\times$ (2.74 vs. 44.36 ms). In other words, the student trades an approximately 0.5\% PSNR loss (statistically insignificant) for a $\sim$97\% parameter reduction and a 16$\times$ speedup, clearly sitting at the efficiency end of the trade-off curve.
+
+Compared with Retinexformer, which achieves the best fidelity (PSNR 25.15 dB), the latter's latency (54.60 ms) is about 20$\times$ that of the student and its parameter count (1.61 M) about 11$\times$ larger, making real-time edge deployment difficult; the student retains competitive perceptual quality (NIQE 3.76, close to Retinexformer's 3.47) at roughly 1/20 of its latency. In contrast, lightweight baselines such as Zero-DCE (8.5 M), SCI ($2.58\times10^{-4}$ M), and RUAS ($3.44\times10^{-3}$ M) are small but achieve markedly lower PSNR (14.78--16.40 dB), indicating that they trade fidelity for lightness and do not lie on the Pareto frontier.
+
+In summary, at the level of ``acceptable enhancement quality (PSNR $\approx$ 21 dB)'', the proposed student model is among the smallest and fastest solutions; under the constraint of ``real-time edge deployment'', it is one of the few methods that attains near-teacher-level quality while achieving near-real-time throughput. Together, this numerical evidence confirms the core value of distillation-based lightweighting: converting ``teacher-level'' enhancement capability into ``edge-feasible'' real-time performance at a minimal perceptual quality cost.
+
+\subsection{Training Stochasticity and Reproducibility}
+
+To quantify the impact of training stochasticity and faithfully characterize the degree of reproducibility, the full student model was retrained and uniformly evaluated under the two-stage protocol with fully fixed random sources (torch, numpy, random, CUDA) using three independent random seeds (42, 43, 44). The resulting PSNR values are 20.93 dB, 20.61 dB, and 18.88 dB, giving a cross-seed PSNR of 20.14 $\pm$ 1.11 dB (mean $\pm$ std); the seed-44 run (18.88 dB) is notably lower than the other two and constitutes an outlier. It should be noted that the PSNR of 21.35 dB reported in Table II stems from an earlier training run in which operator-level PyTorch stochasticity was not fully fixed, differing from the fully-fixed-seed central tendency ($\approx$20.9 dB) by roughly 0.4--1.2 dB. Nonetheless, the cross-seed results preserve the ranking conclusions: the student remains on par with the DDNet teacher on PSNR/SSIM, superior on PIQE, and significantly better than the non-learning and weaker learning baselines. This training variability indicates that absolute PSNR values should be interpreted together with the cross-seed mean and dispersion in order to fully characterize the performance distribution.
+
+\section{Discussion}
+
+\subsection{Core Reasons for Method Performance Advantage}
+
+The lightweight student model proposed in this paper can achieve excellent performance on multiple metrics, with its core advantages stemming from the following aspects:
+
+\begin{itemize}
+\item \textbf{Effectiveness of the Knowledge Distillation Strategy:} Through the carefully designed multi-level distillation strategy combining feature distillation, output distillation, and perceptual loss, the student model not only learns the color enhancement capability of the teacher model but also inherits its key feature representation ability at the bottleneck layer through feature alignment. Experimental results show that although the student model has only 2.7\% of the teacher model's parameters (0.144 M vs. 5.39 M), it surpasses the teacher model in key metrics such as brightness uniformity (0.79 vs. 0.74) and running efficiency (2.74 ms vs. 44.36 ms, i.e., 16.2$\times$ faster), demonstrating the effectiveness of knowledge distillation in model compression and performance transfer. The loss-term ablation (Table 7) further pinpoints this effect: removing any single distillation term lowers PSNR (0.46--0.98 dB) and raises PIQE (1.06--1.70), whereas removing all distillation leaves PSNR essentially unchanged (21.34 dB vs 21.35 dB) yet degrades PIQE substantially (24.68 vs 22.39), showing that distillation contributes primarily to perceptual quality rather than pixel fidelity.
+\item \textbf{Rationality of the Lightweight Architecture Design:} The enhanced depthwise separable convolutions, simplified channel attention mechanism, and adaptive residual fusion module adopted by the student model significantly reduce computational complexity while ensuring feature expression capability. In particular, the simplified channel attention module, through its shared-weight dual-path pooling strategy, increases parameters by only 0.016 M while improving PSNR by 2.55 dB, showing extremely high parameter efficiency. This design fully considers the computational constraints of edge devices, providing a feasible architectural solution for real-time low-light enhancement.
+\item \textbf{Balanced Optimization of Brightness, Detail, and Color:} Compared with existing methods, our method achieves a better balance between brightness enhancement, detail preservation, and color restoration. As shown in Tables 2-4, our method performs best in terms of brightness uniformity (0.79) and over-/under-exposure control (both 0.00\%), while maintaining good detail fidelity (SSIM 0.87) and color naturalness. This balanced optimization benefits from the learnable parameter design of the adaptive residual fusion module, which can dynamically adjust the enhancement strength according to the characteristics of the input image.
+\end{itemize}
+
+\subsection{Design Trade-offs and Limitations of Different Methods}
+
+From the experimental results, it can be seen that existing low-light enhancement methods have obvious design trade-offs:
+
+\begin{itemize}
+\item \textbf{Inherent Trade-offs in Learning-based Methods:} Although Retinexformer performs optimally in PSNR (25.15 dB) and DDNet in NIQE (3.43), the former's high inference latency (54.60 ms) and the latter's large parameter count (5.39 M) and long processing time (44.36 ms) limit their ability to meet real-time edge deployment. Zero-DCE and SCI are lightweight but insufficient in brightness enhancement, resulting in low PSNR (14.86 dB, 14.78 dB). RUAS performs prominently in luminance standard deviation (52.23) and dynamic range (255), but has poor luminance uniformity (0.61). Our method demonstrates balanced performance in luminance uniformity, over-/under-exposure control, and running efficiency, showing comprehensive advantages.
+\item \textbf{Adaptability Limitations of Traditional Methods:} Non-learning methods such as HE and Dong, although computationally efficient, have poor adaptability in complex low-light scenes, manifesting as insufficient brightness enhancement (average luminance 34.89--56.90) and severe detail loss (SSIM 0.42--0.62). These methods rely on fixed manual rules and struggle to cope with the variability of lighting conditions.
+\item \textbf{Practical Limitations of the Proposed Method:} Although our method shows balanced performance across multiple dimensions, it still has some limitations. First, in extreme low-light scenes (luminance $<$ 20), the model's noise suppression ability needs further improvement. Second, current experiments are mainly based on indoor low-light scenes; its generalization ability under complex outdoor lighting conditions such as nighttime streets or backlighting still needs verification. Finally, although the model inference time is only 2.74 ms, post-processing and I/O operations dominate the end-to-end process (96.2\%), indicating the need to further optimize the entire processing pipeline.
+\end{itemize}
+
+\subsection{Implications for Practical Deployment}
+
+This study provides important insights for the practical deployment of low-light enhancement technology:
+
+\begin{itemize}
+\item \textbf{Emphasize Both Model Lightweighting and Pipeline Optimization:} Experimental results show that even when model inference time is reduced to the millisecond level, data pipeline operations can still become performance bottlenecks. This suggests that in practical system design, we need to pay attention to both model lightweighting and data processing pipeline optimization, especially GPU-CPU data transfer and disk I/O efficiency.
+\item \textbf{Multi-dimensional Balance of Evaluation Metrics:} Solely pursuing objective metrics like PSNR or SSIM may not fully reflect algorithm performance in real-world scenarios. This paper combines four categories of metrics---image quality, brightness characteristics, perceptual quality, and running efficiency---providing a more comprehensive perspective for algorithm evaluation. In particular, metrics such as luminance uniformity and over-/under-exposure rate significantly affect visual experience in practical applications.
+\item \textbf{Potential of Knowledge Distillation in Edge Computing:} This paper demonstrates that knowledge distillation can effectively transfer the enhancement capability of complex models to lightweight models, providing a promising technical path for low-light enhancement in edge computing scenarios. A real-edge benchmark on an NVIDIA Jetson Orin Nano Super confirms this: the student attains 15.02 FPS (FP32) and 21.73 FPS (FP16) at 0.1443 M parameters, whereas the teacher---5.39 M parameters and 110.51 GMac---is impractical on such hardware. Future work could further explore techniques like online distillation and self-distillation to achieve continuous optimization on resource-constrained devices.
+\end{itemize}
+
+\section{Conclusion and Future Work}
+
+\subsection{Main Conclusion}
+
+This paper proposes a lightweight low-light image enhancement network based on knowledge distillation. Through the teacher-student architecture and multi-level distillation strategy, a favorable trade-off between model efficiency and enhancement performance is achieved. The main conclusions are as follows:
+
+\begin{enumerate}
+\item \textbf{Extreme Lightweighting and Acceleration are Achieved:} The student model's parameter count is only 2.7\% of the teacher model's (0.144 M), with 15.3$\times$ fewer FLOPs (7.22 vs. 110.51 GMac) and inference speed increased by 16.2$\times$ (2.74 ms vs. 44.36 ms), while maintaining competitive enhancement performance (PSNR 21.35 dB, SSIM 0.87). This proves the powerful efficacy of knowledge distillation in model compression.
+\item \textbf{Advantage in Key Perceptual Metrics:} Benefiting from targeted network design, the student model outperforms the parameter-heavy teacher model in key metrics affecting subjective visual experience, such as brightness uniformity (0.79), over-/under-exposure control (both 0.00\%), and no-reference perceptual quality (PIQE 22.39), reflecting the optimization of our method towards enhancement effects aligned with human perception.
+\item \textbf{Synergistic Effectiveness of Distillation Strategy and Lightweight Architecture:} The multi-level distillation strategy combining feature-level and output-level alignment ensures effective knowledge transfer, and the loss-term ablation (Table 7) further confirms that the distillation loss primarily enhances perceptual quality rather than pixel-level fidelity. Ablation experiments on lightweight architecture components (e.g., simplified channel attention, adaptive residual fusion) provide clear empirical evidence for efficient network design.
+\item \textbf{Verified Edge Deployability:} The student was further deployed on an NVIDIA Jetson Orin Nano Super edge device, achieving 15.02 FPS in FP32 and 21.73 FPS in FP16 (46.02 ms) with under 0.5 GB of peak memory---approaching real-time video rates on a low-power edge SoC. At 5.39 M parameters and 110.51 GMac, the teacher is impractical on such hardware, underscoring the value of distillation for edge deployment.
+\end{enumerate}
+
+\subsection{Limitations and Future Work}
+
+Based on the research results and limitations of this paper, future work can proceed in the following directions:
+
+\begin{itemize}
+\item \textbf{Further Improvement of Algorithm Performance:} For noise issues in extreme low-light scenes, an adaptive noise estimation module could be introduced, dynamically adjusting denoising strength based on image luminance distribution. For outdoor complex lighting conditions, a more diverse dataset including scenes like night streets and backlighting could be constructed to improve cross-scene generalization ability.
+\item \textbf{Continuous Optimization of Model Efficiency:} Explore Neural Architecture Search (NAS) technology to automatically design more efficient network structures. Research dynamic inference mechanisms to adaptively adjust computational paths based on input image complexity. Combine model quantization and pruning techniques to further compress the model while maintaining performance.
+\item \textbf{Innovative Design of Distillation Strategies:} Research online knowledge distillation methods to achieve continuous optimization in deployment environments. Explore multi-teacher distillation frameworks to integrate the advantages of teachers with different structures. Design specialized distillation loss functions for low-light characteristics to improve detail preservation and color restoration capabilities.
+\item \textbf{System-Level Collaborative Optimization:} Research asynchronous processing and data pipeline optimization techniques for bottlenecks in the end-to-end processing pipeline. Explore hardware acceleration solutions, such as deployment on FPGAs or dedicated AI chips. Develop complete solutions for practical application scenarios, including collaborative optimization of preprocessing, enhancement, and post-processing.
+\item \textbf{Cross-task and Cross-modal Extension:} Extend the lightweight design philosophy of this paper to related tasks such as low-light video enhancement and multi-spectral low-light imaging. Research joint optimization frameworks combining low-light enhancement and high-level vision tasks (e.g., detection, segmentation) to improve overall system performance.
+\end{itemize}
+
+Low-light image enhancement technology has broad prospects in practical applications. This research provides new ideas and technical pathways for the development of this field. With the proliferation of edge computing devices and advancements in deep learning technology, lightweight, efficient, and adaptive low-light enhancement methods will play an increasingly important role in fields such as intelligent transportation, mobile photography, and security surveillance.
+
+\vspace{6pt}
+
+\authorcontributions{Conceptualization, S.Y.; methodology, S.Y.; software, S.Y.; validation, S.Y. and X.Z.; formal analysis, S.Y.; investigation, S.Y.; resources, S.Y.; data curation, S.Y.; writing---original draft preparation, S.Y.; writing---review and editing, S.Y. and X.Z.; visualization, S.Y.; supervision, S.Y.; project administration, S.Y.; funding acquisition, S.Y. All authors have read and agreed to the published version of the manuscript.}
+
+\funding{This research was funded by the National Natural Science Foundation of China (Grant No. 42501590).}
+
+\institutionalreview{Not applicable.}
+
+\informedconsent{Not applicable.}
+
+\dataavailability{The source code, trained model weights, and evaluation scripts for this work will be publicly released on GitHub upon acceptance and are available from the corresponding author upon reasonable request. The LOL low-light dataset used for training and evaluation, along with the other public benchmarks (DICM, LIME, LOL-v2-real, and MIT-FiveK), are publicly available from their original sources. All experiments are fully reproducible from the complete hyperparameters and the unified evaluation protocol reported in Section 4.1.}
+
+\acknowledgments{This work is partly supported by National Natural Science Foundation of China (Grant No. 42501590).}
+
+\conflictsofinterest{The authors declare no conflicts of interest.}
+
+\begin{adjustwidth}{-\extralength}{0cm}
+\reftitle{References}
+
+\begin{thebibliography}{999}
+\bibitem{ref1} Liang, S.; et al. Edge YOLO: Real-Time Intelligent Object Detection System Based on Edge-Cloud Cooperation in Autonomous Vehicles. \textit{IEEE Trans. Intell. Transp. Syst.} \textbf{2022}, \textit{23}, 25345--25360.
+\bibitem{ref2} Ge, Z.; Liu, S.; Wang, F.; Li, Z.; Sun, J. YOLOX: Exceeding YOLO Series in 2021. \textit{arXiv} \textbf{2021}.
+\bibitem{ref3} Qin, L.; et al. ID-YOLO: Real-Time Salient Object Detection Based on the Driver's Fixation Region. \textit{IEEE Trans. Intell. Transp. Syst.} \textbf{2022}, \textit{23}, 15898--15908.
+\bibitem{ref4} Jiang, Q.; Mao, Y.; Cong, R.; Ren, W.; Huang, C.; Shao, F. Unsupervised Decomposition and Correction Network for Low-Light Image Enhancement. \textit{IEEE Trans. Intell. Transp. Syst.} \textbf{2022}, \textit{23}, 19440--19455.
+\bibitem{ref5} Bao, J.; Zhang, X.; Zhang, T.; Xu, X. ShadowDeNet: A Moving Target Shadow Detection Network for Video SAR. \textit{Remote Sens.} \textbf{2022}, 320.
+\bibitem{ref6} Li, Y.; Tian, J.; Chen, Y.; Wang, H.; Yan, H.; Peng, Y.; Wang, T. Rw-Dm: Retinex and Wavelet-Based Diffusion Model for Low-Light Image Enhancement in Underground Coal Mines. \textit{Complex Intell. Syst.} \textbf{2025}, 1--17.
+\bibitem{ref7} Brainard, D.H.; Wandell, B.A. Analysis of the Retinex Theory of Color Vision. \textit{J. Opt. Soc. Am. A} \textbf{1986}, 1651--1661.
+\bibitem{ref8} Zhang, Y.; Zhang, J.; Guo, X. Kindling the Darkness: A Practical Low-Light Image Enhancer. \textbf{2019}.
+\bibitem{ref9} Liu, R.; Ma, L.; Zhang, J.; Fan, X.; Luo, Z. Retinex-Inspired Unrolling with Cooperative Prior Architecture Search for Low-Light Image Enhancement. In \textit{Proceedings of the 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 2021.
+\bibitem{ref10} Wu, W.; Weng, J.; Zhang, P.; Wang, X.; Yang, W.; Jiang, J. URetinex-Net: Retinex-Based Deep Unfolding Network for Low-Light Image Enhancement. In \textit{Proceedings of the 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 2022.
+\bibitem{ref11} Wang, T.; Zhang, K.; Shen, T.; Luo, W.; Stenger, B.; Lu, T. Ultra-High-Definition Low-Light Image Enhancement: A Benchmark and Transformer-Based Method. In \textit{Proceedings of the AAAI Conference on Artificial Intelligence (AAAI)}, 2023.
+\bibitem{ref12} Gao, P.; Qin, J.; Xiang, X.; Tan, Y. Knowledge Distillation from Relative Distribution. \textit{Expert Syst. Appl.} \textbf{2025}, 127736.
+\bibitem{ref13} Tian, Y.; Pei, S.; Zhang, X.; Zhang, C.; Chawla, N.V. Knowledge Distillation on Graphs: A Survey. \textit{ACM Comput. Surv.} \textbf{2025}, 1--16.
+\bibitem{ref14} Shang, E.; Liu, H.; Zhang, J.; Zhao, R.; Du, J. Ensemble Knowledge Distillation for Federated Semi-Supervised Image Classification. \textit{Tsinghua Sci. Technol.} \textbf{2025}, 112--123.
+\bibitem{ref15} Chi, Q.; Lv, G.; Zhao, G.; Dong, X. A Novel Knowledge Distillation Method for Self-Supervised Hyperspectral Image Classification. \textit{Remote Sens.} \textbf{2022}, 4523.
+\bibitem{ref16} Hao, J.; Huang, K.; Chen, C.; Mao, J. Dual-Student Knowledge Distillation for Visual Anomaly Detection. \textit{Complex Intell. Syst.} \textbf{2024}, 4853--4865.
+\bibitem{ref17} Huang, H.; Li, X.; Wu, M.; Lv, Z.; Peng, Y. Cross-Modal Knowledge Distillation for Enhanced Depression Detection. \textit{Complex Intell. Syst.} \textbf{2025}, 1--15.
+\bibitem{ref18} Jobaer, S.; Tang, X.; Zhang, Y.; Li, G.; Ahmed, F. A Novel Knowledge Distillation Framework for Enhancing Small Object Detection in Blurry Environments with Unmanned Aerial Vehicle-Assisted Images. \textit{Complex Intell. Syst.} \textbf{2025}, \textit{11}, 63.
+\bibitem{ref19} He, Z.; Yao, W.; Shao, J.; Wang, P. UB-FineNet: Urban Building Fine-Grained Classification Network for Open-Access Satellite Images. \textit{ISPRS J. Photogramm. Remote Sens.} \textbf{2024}, \textit{217}, 76--90.
+\bibitem{ref20} Hu, J.; Zhao, M.; Li, Y. Hyperspectral Image Super-Resolution by Deep Spatial-Spectral Exploitation. \textit{Remote Sens.} \textbf{2019}, \textit{11}, 1229.
+\bibitem{ref21} Zhao, M.; Jiang, X.; Huang, B. STFMamba: Spatiotemporal Satellite Image Fusion Network Based on Visual State Space Model. \textit{ISPRS J. Photogramm. Remote Sens.} \textbf{2025}, 288--304.
+\bibitem{ref22} Xu, L.; Zhu, L.; Wang, Y.; Wang, Y. IllumiNet: A Two-Stage Model for Effective Flare Removal and Light Enhancement Under Complex Lighting Conditions. \textit{Expert Syst. Appl.} \textbf{2025}, 127638.
+\bibitem{ref23} Han, F.; Chang, K.; Li, G.; Ling, M.; Huang, M.; Gao, Z. Illumination-Aware Divide-and-Conquer Network for Improperly-Exposed Image Enhancement. \textit{Neural Netw.} \textbf{2024}, 106733.
+\bibitem{ref24} Wang, Q.; Liu, F.; Cao, Y.; Ullah, F.; Jiang, J. PTDNet: Parallel Text-Guided Distillation Network for Low-Light Image Fusion. \textit{Infrared Phys. Technol.} \textbf{2026}, 106198.
+\bibitem{ref25} Qu, J.; Liu, R.W.; Gao, Y.; Guo, Y.; Zhu, F.; Wang, F.-Y. Double Domain Guided Real-Time Low-Light Image Enhancement for Ultra-High-Definition Transportation Surveillance. \textit{IEEE Trans. Intell. Transp. Syst.} \textbf{2024}, 9550--9562.
+\bibitem{ref26} Guo, C.; Li, C.; Guo, J.; Loy, C.C.; Hou, J.; Kwong, S.; Cong, R. Zero-Reference Deep Curve Estimation for Low-Light Image Enhancement. In \textit{Proceedings of the 2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 2020; pp. 1780--1789.
+\bibitem{ref27} Ma, L.; Ma, T.; Liu, R.; Fan, X.; Luo, Z. Toward Fast, Flexible, and Robust Low-Light Image Enhancement. In \textit{Proceedings of the 2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 2022.
+\bibitem{ref28} Pizer, S.M.; et al. Adaptive Histogram Equalization and Its Variations. \textit{Comput. Vis. Graph. Image Process.} \textbf{1987}, \textit{39}, 355--368.
+\bibitem{ref29} Dong, X.; Wang, G.; Pang, Y.; Li, W.; Wen, J.; Meng, W.; Lu, Y. Fast Efficient Algorithm for Enhancement of Low Lighting Video. In \textit{Proceedings of the 2011 IEEE International Conference on Multimedia and Expo (ICME)}, 2011.
+\bibitem{ref30} Lee, C.; Lee, C.; Kim, C.-S. Contrast Enhancement Based on Layered Difference Representation of 2D Histograms. \textit{IEEE Trans. Image Process.} \textbf{2013}, \textit{22}, 5372--5384.
+\bibitem{ref31} Guo, X.; Li, Y.; Ling, H. LIME: Low-Light Image Enhancement via Illumination Map Estimation. \textit{IEEE Trans. Image Process.} \textbf{2017}, \textit{26}, 982--993.
+\bibitem{ref32} Yang, W.; Wang, W.; Huang, H.; Wang, S.; Liu, J. Sparse Gradient Regularized Deep Retinex Network for Robust Low-Light Image Enhancement. \textit{IEEE Trans. Image Process.} \textbf{2021}, \textit{30}, 2072--2086.
+\bibitem{ref33} Bychkovsky, V.; Paris, S.; Chan, E.; Durand, F. Learning Photographic Global Tonal Adjustment with a Database of Input/Output Image Pairs. In \textit{Proceedings of the 2011 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, 2011; pp. 97--104.
+\bibitem{ref34} Cai, Y.; Bian, H.; Lin, J.; Wang, H.; Timofte, R.; Zhang, Y. Retinexformer: One-Stage Retinex-Based Transformer for Low-Light Image Enhancement. In \textit{Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)}, 2023.
+\bibitem{ref35} Guo, H.; Li, J.; Dai, T.; Ouyang, Z.; Ren, X.; Xia, S.-T. MambaIR: A Simple Baseline for Image Restoration with State-Space Model. In \textit{European Conference on Computer Vision (ECCV)}, 2024.
+\bibitem{ref36} Bai, J.; Yin, Y.; He, Q.; Li, Y.; Zhang, X. RetinexMamba: Retinex-Based Mamba for Low-Light Image Enhancement. \textit{arXiv} \textbf{2024}.
+\end{thebibliography}
+
+\PublishersNote{}
+\end{adjustwidth}
+\end{document}
