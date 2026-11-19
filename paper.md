@@ -54,7 +54,7 @@ The proposed knowledge distillation framework consists of two parts: a teacher m
 
 During training, a low-light image is simultaneously input into both the teacher and student models, yielding respective enhancement results. The outputs of the two models are constrained by the designed distillation loss function, enabling the student model to approximate the teacher model's enhancement capability with far fewer parameters.
 
-### B. Teacher Model
+### B. Teacher Model and Overall Distillation Framework
 
 The teacher model employs a multi-stage architecture for fusion-decomposition-fusion processing of the color domain and gradient domain. To facilitate understanding, Fig. 1 illustrates the architectural design of DDNet. Specifically, the low-light image is first concatenated with its corresponding gradient feature map based on LoG and then fed into the network. This architecture introduces six self-calibrating convolutions (ScCAM) with attention modules into the peripheral encoder, decoder, Gradient Enhancement Module (GEM), and Coarse Enhancement Module (CEM), respectively.
 
