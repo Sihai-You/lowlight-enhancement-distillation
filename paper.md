@@ -1,6 +1,10 @@
 # Research on a Real-Time Low-Light Image Enhancement Lightweight Network Based on Knowledge Distillation
 
-**Sihai You, Xin Zhao**
+**Sihai You<sup>1,\*</sup>, Xin Zhao<sup>1</sup>**
+
+<sup>1</sup> Rocket Force University of Engineering, Xi'an, China
+
+<sup>\*</sup> Corresponding author: yousihai12345@163.com
 
 ---
 
