@@ -56,13 +56,21 @@ During training, a low-light image is simultaneously input into both the teacher
 
 ### B. Teacher Model
 
-The teacher model employs a multi-stage architecture for fusion-decomposition-fusion processing of the color domain and gradient domain. To facilitate understanding, Fig. 1 illustrates the architectural design of DDNet. Specifically, the low-light image is first concatenated with its corresponding gradient feature map based on LoG and then fed into the network. This architecture introduces six self-calibrating convolutions (ScCAM) with attention modules into the peripheral encoder, decoder, Global Energy Module (GEM), and Convolutional Energy Module (CEM), respectively.
+The teacher model employs a multi-stage architecture for fusion-decomposition-fusion processing of the color domain and gradient domain. To facilitate understanding, Fig. 1 illustrates the architectural design of DDNet. Specifically, the low-light image is first concatenated with its corresponding gradient feature map based on LoG and then fed into the network. This architecture introduces six self-calibrating convolutions (ScCAM) with attention modules into the peripheral encoder, decoder, Gradient Enhancement Module (GEM), and Coarse Enhancement Module (CEM), respectively.
 
-![Fig. 1 DDNet teacher-model architecture](figs/fig1.png)
+![DDNet teacher-model architecture](figs/fig1.png)
+
+**Fig. 1**  DDNet teacher-model architecture
+
+Fig. 2 illustrates the overall knowledge distillation framework of the proposed method. The low-light image is fed simultaneously into the pre-trained teacher model DDNet and the student model. The teacher, with frozen weights, provides the dual-domain enhancement reference output T, while the student output S is aligned with the teacher output through a multi-level distillation loss (cosine similarity, perceptual, brightness, contrast, and SSIM). Meanwhile, the normal-light ground-truth image Y serves as an anchor for the reconstruction loss, and the final enhanced image is produced via adaptive residual fusion.
+
+![Overall teacher-student knowledge distillation framework of the proposed method](figs/fig2.png)
+
+**Fig. 2**  Overall teacher-student knowledge distillation framework of the proposed method
 
 ### C. Student Model Design
 
-To meet the demand for real-time low-light image enhancement, this study proposes a lightweight image enhancement network based on knowledge distillation. This network aims to inherit the enhancement capabilities of the dual-domain guided teacher model (DDNet) while significantly reducing computational complexity to meet the real-time processing requirements of ultra-high-definition video streams. As shown in Fig. 2, the student model adopts an encoder-decoder architecture. Its core design lies in achieving efficient image enhancement with limited parameters through depthwise separable convolutions, a simplified attention mechanism, and adaptive residual fusion.
+To meet the demand for real-time low-light image enhancement, this study proposes a lightweight image enhancement network based on knowledge distillation. This network aims to inherit the enhancement capabilities of the dual-domain guided teacher model (DDNet) while significantly reducing computational complexity to meet the real-time processing requirements of ultra-high-definition video streams. As shown in Fig. 3, the student model adopts an encoder-decoder architecture. Its core design lies in achieving efficient image enhancement with limited parameters through depthwise separable convolutions, a simplified attention mechanism, and adaptive residual fusion.
 
 The network input is a three-channel low-light image. First, basic features are extracted through an initial convolutional layer. Subsequently, the features undergo downsampling and abstraction through a two-level encoder: the first-level encoder consists of depthwise separable convolutions and max pooling, expanding the number of channels to 64 and halving the spatial resolution; the second-level encoder further expands the channels to 128 and reduces the resolution to 1/4 of the original through depthwise separable convolutions, residual blocks, and pooling operations. The encoded high-dimensional features are then fed into a bottleneck layer. This layer first expands the channels to 256 through depthwise separable convolutions and residual blocks, and then introduces a lightweight simplified channel attention module.
 
@@ -82,7 +90,9 @@ where ⊗ denotes element-wise channel multiplication. This design significantly
 
 The decoding process aims to restore the spatial details and original resolution of the image. The first-level decoder processes the attention-weighted features with depthwise separable convolutions, recovers half of the resolution via bilinear upsampling, and then concatenates and fuses them with the output features of the first-level encoder through skip connections. The second-level decoder operates similarly, finally fusing with the features from the initial convolutional layer to fully restore the resolution to the original size. The network's final output layer generates a preliminary enhancement result I_enh through convolution and the Sigmoid activation function.
 
-![Fig. 2 Architecture of the lightweight student model](figs/fig2.png)
+![Architecture of the lightweight student model](figs/fig3.png)
+
+**Fig. 3**  Architecture of the lightweight student model
 
 To balance enhancement effects and naturalness, an adaptive residual fusion module is designed. This module dynamically fuses the original input I_in with the network output I_enh through two learnable parameters α and β, yielding the final enhanced image I_out:
 
@@ -161,9 +171,11 @@ In summary, the full optimized model proposed in this paper (0.144 M parameters,
 
 ### 4.4 Analysis of Subjective Visual Effects
 
-Fig. 3 shows a comparison of enhancement results by different methods in low-light scenes against the normal-light ground truth. Combined with the performance of objective metrics, the visual performance of our method can be further verified:
+Fig. 4 shows a comparison of enhancement results by different methods in low-light scenes against the normal-light ground truth. Combined with the performance of objective metrics, the visual performance of our method can be further verified:
 
-![Fig. 3 Visual comparison of low-light image enhancement results](figs/fig3.png)
+![Visual comparison of low-light image enhancement results](figs/fig4.png)
+
+**Fig. 4**  Visual comparison of low-light image enhancement results
 
 - **Brightness Match with Ground Truth:** The brightness of the enhancement results from our method is highly consistent with the ground truth. The overall brightness is uniform across all scenes, with no local overexposure or underexposure (e.g., the bathroom scene in column 2, the doll area in column 7). In contrast, DDNet's brightness is slightly higher than the ground truth; Zero-DCE and SCI have significantly lower brightness; HE and Dong's enhancement results remain close to the low-light input, showing a large gap from the ground truth.
 - **Detail and Texture Fidelity:** Our method completely preserves the texture details of objects (e.g., clothing wrinkles in column 3, paper edges in column 8), achieving the highest consistency in details with the ground truth. DDNet shows slight detail blurring (e.g., doll fur in column 6). Zero-DCE and SCI exhibit artifacts in high-contrast areas (e.g., the door frame in column 1). HE and Dong lose a large amount of detail in dark areas (e.g., the outlines of items on the storage shelf in column 9).
