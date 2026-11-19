@@ -31,10 +31,10 @@
 \AuthorNames{Sihai You and Xin Zhao}
 
 % Affiliations
-\address{\textsuperscript{1} \quad Affiliation 1; email@example.com}
+\address{\textsuperscript{1} \quad Rocket Force University of Engineering, Xi'an, China; yousihai12345@163.com}
 
 % Contact information of the corresponding author
-\corres{Correspondence: email@example.com}
+\corres{Correspondence: yousihai12345@163.com}
 
 % Abstract
 \abstract{To address the issues of high computational complexity and difficulty in deploying existing low-light image enhancement models on mobile devices, this paper proposes a real-time low-light image enhancement method based on knowledge distillation. This method constructs a teacher-student network architecture: using the high-performance DDNet as the teacher model to guide the learning of the student model---a self-designed lightweight encoder-decoder network. By designing a multi-level distillation loss function, the enhancement capability of the teacher model is efficiently transferred to the student model. Experimental results on the LOL dataset show that the proposed student model achieves a favorable trade-off between enhancement quality and efficiency while being extremely lightweight: it uses only 2.7\% of the teacher model's parameters (0.144 M vs 5.39 M), requires 15.3$\times$ fewer FLOPs (7.22 vs 110.51 GMac), and runs 16.2$\times$ faster (2.74 ms vs 44.36 ms per image, 365 FPS). In terms of enhancement quality, the student model attains visual fidelity comparable to that of the teacher model (PSNR 21.35 dB, SSIM 0.87 vs 0.86) and perceptual quality superior to the teacher (PIQE 22.39 vs 26.81) together with the best brightness uniformity (0.79). Ablation experiments verify the effectiveness of core components such as the attention mechanism. Beyond 365 FPS on a datacenter GPU, the student is benchmarked on an NVIDIA Jetson Orin Nano Super edge device, where it reaches 15.02 FPS in FP32 and 21.73 FPS in FP16 (46.02 ms) with less than 0.5 GB of peak memory, approaching the real-time video threshold and confirming its practical deployability on resource-constrained edge devices.}

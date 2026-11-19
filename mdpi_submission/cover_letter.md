@@ -29,5 +29,5 @@ We thank you for your consideration and look forward to your response.
 Sincerely,
 
 **Sihai You** (Corresponding Author)
-[Affiliation]
-[Email]
+Rocket Force University of Engineering, Xi'an, China
+yousihai12345@163.com
